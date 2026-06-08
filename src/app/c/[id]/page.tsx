@@ -3,7 +3,7 @@
 import React, { useState, useEffect, use } from 'react';
 import Link from 'next/link';
 import { detectMiniPay, connectMiniPay, sendCUSD } from '@/lib/minipay';
-import { getLinkById, hasPurchased, recordPurchase, getCreatorByHandle } from '@/app/actions/creator';
+import { getLinkWithCreator, hasPurchased, recordPurchase } from '@/app/actions/creator';
 import type { PicoLink } from '@/db/schema';
 
 const TYPE_EMOJI: Record<string, string> = {
@@ -11,14 +11,13 @@ const TYPE_EMOJI: Record<string, string> = {
   call: '🎯', audio: '🎙️', video: '🎬', other: '🎁',
 };
 
-const OPERATOR = process.env.NEXT_PUBLIC_OPERATOR_ADDRESS as `0x${string}`;
-
 type UIState = 'loading' | 'no-minipay' | 'idle' | 'sending' | 'verifying' | 'unlocked' | 'already-owned';
 
 export default function SupportPage(props: { params: Promise<{ id: string }> }) {
   const { id } = use(props.params);
 
-  const [link, setLink]           = useState<PicoLink | null>(null);
+  const [link, setLink]             = useState<PicoLink | null>(null);
+  const [creatorWallet, setCreatorWallet] = useState<`0x${string}` | ''>('');
   const [creatorHandle, setCreatorHandle] = useState('');
   const [state, setState]         = useState<UIState>('loading');
   const [contentUrl, setContentUrl] = useState('');
@@ -30,16 +29,17 @@ export default function SupportPage(props: { params: Promise<{ id: string }> }) 
       const found = await detectMiniPay();
       if (!found) { setState('no-minipay'); return; }
 
-      const linkData = await getLinkById(id);
-      if (!linkData) { setState('idle'); return; }
-      setLink(linkData);
+      const result = await getLinkWithCreator(id);
+      if (!result) { setState('idle'); return; }
+      setLink(result.link);
+      setCreatorWallet(result.creatorWallet);
 
       try {
         const { address } = await connectMiniPay();
         const owned = await hasPurchased(id, address);
         if (owned) {
-          setContentUrl(linkData.contentUrl ?? '');
-          setThankYou(linkData.thankYouMessage ?? '');
+          setContentUrl(result.link.contentUrl ?? '');
+          setThankYou(result.link.thankYouMessage ?? '');
           setState('already-owned');
           return;
         }
@@ -51,14 +51,15 @@ export default function SupportPage(props: { params: Promise<{ id: string }> }) 
   }, [id]);
 
   const handlePay = async () => {
-    if (!link || !OPERATOR) return;
+    if (!link || !creatorWallet) return;
     setErrorMsg('');
 
     try {
       // Step 1 — connect wallet & send cUSD
       setState('sending');
       await connectMiniPay(); // ensures correct chain
-      const txHash = await sendCUSD(OPERATOR, link.price);
+      // Payment goes directly to the creator's MiniPay wallet
+      const txHash = await sendCUSD(creatorWallet as `0x${string}`, link.price);
 
       // Step 2 — verify on-chain (server waits for Celo confirmation)
       setState('verifying');

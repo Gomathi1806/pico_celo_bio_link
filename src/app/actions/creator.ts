@@ -123,6 +123,65 @@ export async function hasPurchased(linkId: string, buyerAddress: string) {
   return !!p;
 }
 
+/** One-shot: create creator + first link from the landing page form */
+export async function createCreatorWithLink(data: {
+  walletAddress: string;
+  displayName: string;
+  purpose: string;
+  price: string;
+}) {
+  const db = getDb();
+  const wallet = data.walletAddress.toLowerCase();
+
+  // Auto-generate handle from display name
+  const base = data.displayName
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, '_')
+    .replace(/_+/g, '_')
+    .replace(/^_|_$/, '')
+    .slice(0, 18) || 'creator';
+
+  const suffix = wallet.slice(2, 6); // last 4 hex chars as tie-breaker
+  let handle = base;
+  const taken = await db.query.creators.findFirst({ where: eq(creators.handle, handle) });
+  if (taken && taken.walletAddress !== wallet) handle = `${base}_${suffix}`;
+
+  // Upsert creator
+  let creator = await db.query.creators.findFirst({
+    where: eq(creators.walletAddress, wallet),
+  });
+  if (!creator) {
+    const [c] = await db.insert(creators).values({
+      walletAddress: wallet,
+      handle,
+      bio: data.displayName, // store display name in bio for now
+    }).returning();
+    creator = c;
+  }
+
+  // Create the link
+  const [link] = await db.insert(picoLinks).values({
+    creatorId: creator.id,
+    title: data.purpose,
+    description: '',
+    price: data.price,
+    type: 'tip',
+  }).returning();
+
+  revalidatePath('/dashboard');
+  return { success: true, linkId: link.id, handle: creator.handle };
+}
+
+/** Get a link AND the creator's wallet address (for direct payment) */
+export async function getLinkWithCreator(id: string) {
+  const db = getDb();
+  const link = await db.query.picoLinks.findFirst({ where: eq(picoLinks.id, id) });
+  if (!link) return null;
+  const creator = await db.query.creators.findFirst({ where: eq(creators.id, link.creatorId) });
+  if (!creator) return null;
+  return { link, creatorWallet: creator.walletAddress as `0x${string}` };
+}
+
 export async function getCreatorEarnings(creatorId: string) {
   const db = getDb();
   const links = await db.query.picoLinks.findMany({

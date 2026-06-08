@@ -94,10 +94,12 @@ export default function DashboardPage() {
         <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', lineHeight: 1.7, marginBottom: '2rem', maxWidth: '260px', margin: '0 auto 2rem' }}>
           Pico is a MiniPay mini app. Open this page inside the MiniPay app on your phone to create your support page.
         </p>
-        <a href="https://minipay.opera.com" target="_blank" rel="noopener noreferrer"
-          className="btn btn-primary" style={{ display: 'block', textDecoration: 'none' }}>
-          Get MiniPay
-        </a>
+        <div className="glass" style={{ padding: '1.25rem', background: 'rgba(53,208,127,0.05)', border: '1px solid rgba(53,208,127,0.2)', borderRadius: '14px', marginBottom: '1rem' }}>
+          <p style={{ fontWeight: 700, marginBottom: '0.3rem', fontSize: '0.9rem' }}>Open this page in MiniPay</p>
+          <p style={{ color: 'var(--text-muted)', fontSize: '0.82rem', lineHeight: 1.5 }}>
+            Download MiniPay from the Opera Mini app, then open this URL inside it to create your page.
+          </p>
+        </div>
         <Link href="/" style={{ display: 'block', marginTop: '1rem', color: 'var(--text-muted)', fontSize: '0.85rem', textDecoration: 'none' }}>
           ← Back home
         </Link>

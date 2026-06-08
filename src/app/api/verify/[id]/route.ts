@@ -1,10 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getLinkById } from "@/app/actions/creator";
+import { getLinkWithCreator } from "@/app/actions/creator";
 import { verifyPayment } from "@/lib/payment";
 import type { CeloNetwork } from "@/lib/minipay";
 
-const OPERATOR = process.env.NEXT_PUBLIC_OPERATOR_ADDRESS as `0x${string}`;
-const NETWORK  = (process.env.NEXT_PUBLIC_CELO_NETWORK ?? "celo-alfajores") as CeloNetwork;
+const NETWORK = (process.env.NEXT_PUBLIC_CELO_NETWORK ?? "celo-alfajores") as CeloNetwork;
 
 export async function POST(
   req: NextRequest,
@@ -21,25 +20,28 @@ export async function POST(
     return NextResponse.json({ error: "txHash required" }, { status: 400 });
   }
 
-  const link = await getLinkById(id);
-  if (!link) return NextResponse.json({ error: "Content not found" }, { status: 404 });
+  // Look up link + creator wallet from DB
+  const found = await getLinkWithCreator(id);
+  if (!found) return NextResponse.json({ error: "Content not found" }, { status: 404 });
 
-  console.log(`[verify/${id}] checking tx ${txHash} for $${link.price} cUSD`);
+  const { link, creatorWallet } = found;
 
-  // Wait up to 30s for the tx to confirm on Celo
+  console.log(`[verify/${id}] checking tx ${txHash} → creator ${creatorWallet} for $${link.price} cUSD`);
+
+  // Wait up to 30s for the tx to confirm on Celo (blocks ~5s)
   let result = await verifyPayment({
     txHash,
-    recipientAddress: OPERATOR,
+    recipientAddress: creatorWallet,
     requiredUsd: parseFloat(link.price),
     network: NETWORK,
   });
 
-  // Retry once after 4s if tx not yet mined (Celo blocks ~5s)
+  // Retry once after 5s if tx not yet mined
   if (!result.valid && result.reason.includes("not found")) {
     await new Promise((r) => setTimeout(r, 5000));
     result = await verifyPayment({
       txHash,
-      recipientAddress: OPERATOR,
+      recipientAddress: creatorWallet,
       requiredUsd: parseFloat(link.price),
       network: NETWORK,
     });
