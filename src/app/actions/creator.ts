@@ -129,57 +129,80 @@ export async function createCreatorWithLink(data: {
   displayName: string;
   purpose: string;
   price: string;
-}) {
-  const db = getDb();
-  const wallet = data.walletAddress.toLowerCase();
+}): Promise<{ success: boolean; linkId?: string; handle?: string; error?: string }> {
+  try {
+    const db = getDb();
+    const wallet = data.walletAddress.toLowerCase();
 
-  // Auto-generate handle from display name
-  const base = data.displayName
-    .toLowerCase()
-    .replace(/[^a-z0-9]/g, '_')
-    .replace(/_+/g, '_')
-    .replace(/^_|_$/, '')
-    .slice(0, 18) || 'creator';
+    // Derive a URL-safe handle from the display name
+    const base = (data.displayName || 'creator')
+      .toLowerCase()
+      .replace(/[^a-z0-9]/g, '_')
+      .replace(/_+/g, '_')
+      .replace(/^_+|_+$/g, '') // trim leading/trailing underscores (global)
+      .slice(0, 18) || 'creator';
 
-  const suffix = wallet.slice(2, 6); // last 4 hex chars as tie-breaker
-  let handle = base;
-  const taken = await db.query.creators.findFirst({ where: eq(creators.handle, handle) });
-  if (taken && taken.walletAddress !== wallet) handle = `${base}_${suffix}`;
+    // Pick a handle that isn't taken by a different wallet
+    const walletSuffix = wallet.slice(2, 6); // 4 hex chars from wallet
+    const candidates = [base, `${base}_${walletSuffix}`, `${base}${Math.floor(Math.random() * 9000 + 1000)}`];
 
-  // Upsert creator
-  let creator = await db.query.creators.findFirst({
-    where: eq(creators.walletAddress, wallet),
-  });
-  if (!creator) {
-    const [c] = await db.insert(creators).values({
-      walletAddress: wallet,
-      handle,
-      bio: data.displayName, // store display name in bio for now
+    let handle = base;
+    for (const candidate of candidates) {
+      const existing = await db.query.creators.findFirst({ where: eq(creators.handle, candidate) });
+      if (!existing || existing.walletAddress === wallet) {
+        handle = candidate;
+        break;
+      }
+    }
+
+    // Upsert creator (idempotent — wallet is unique)
+    let creator = await db.query.creators.findFirst({
+      where: eq(creators.walletAddress, wallet),
+    });
+
+    if (!creator) {
+      const [c] = await db.insert(creators).values({
+        walletAddress: wallet,
+        handle,
+        bio: data.displayName,
+      }).returning();
+      creator = c;
+    }
+
+    // Create the payment link
+    const priceDecimal = parseFloat(data.price).toFixed(2);
+    const [link] = await db.insert(picoLinks).values({
+      creatorId: creator.id,
+      title: data.purpose,
+      description: '',
+      price: priceDecimal,
+      type: 'tip',
     }).returning();
-    creator = c;
+
+    revalidatePath('/dashboard');
+    return { success: true, linkId: link.id, handle: creator.handle };
+  } catch (e) {
+    console.error('[createCreatorWithLink] error:', e);
+    return {
+      success: false,
+      error: e instanceof Error ? e.message : 'Failed to create link. Please try again.',
+    };
   }
-
-  // Create the link
-  const [link] = await db.insert(picoLinks).values({
-    creatorId: creator.id,
-    title: data.purpose,
-    description: '',
-    price: data.price,
-    type: 'tip',
-  }).returning();
-
-  revalidatePath('/dashboard');
-  return { success: true, linkId: link.id, handle: creator.handle };
 }
 
 /** Get a link AND the creator's wallet address (for direct payment) */
 export async function getLinkWithCreator(id: string) {
-  const db = getDb();
-  const link = await db.query.picoLinks.findFirst({ where: eq(picoLinks.id, id) });
-  if (!link) return null;
-  const creator = await db.query.creators.findFirst({ where: eq(creators.id, link.creatorId) });
-  if (!creator) return null;
-  return { link, creatorWallet: creator.walletAddress as `0x${string}` };
+  try {
+    const db = getDb();
+    const link = await db.query.picoLinks.findFirst({ where: eq(picoLinks.id, id) });
+    if (!link) return null;
+    const creator = await db.query.creators.findFirst({ where: eq(creators.id, link.creatorId) });
+    if (!creator) return null;
+    return { link, creatorWallet: creator.walletAddress as `0x${string}` };
+  } catch (e) {
+    console.error('[getLinkWithCreator] error:', e);
+    return null;
+  }
 }
 
 export async function getCreatorEarnings(creatorId: string) {
