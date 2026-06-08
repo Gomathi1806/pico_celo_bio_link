@@ -61,7 +61,19 @@ export default function HomePage() {
     setError('');
     setStage('creating');
     try {
-      const { address } = await connectMiniPay();
+      // Re-connect to get latest address (or reuse already-known one)
+      let address = walletAddr;
+      try {
+        const wallet = await connectMiniPay();
+        address = wallet.address;
+      } catch { /* use walletAddr from initial detection */ }
+
+      if (!address) {
+        setError('Could not get wallet address. Please try again.');
+        setStage('new-creator');
+        return;
+      }
+
       const res = await createCreatorWithLink({
         walletAddress: address,
         displayName: name.trim(),
@@ -72,7 +84,7 @@ export default function HomePage() {
         setNewLinkId(res.linkId);
         setStage('done');
       } else {
-        setError('Something went wrong. Try again.');
+        setError(res.error ?? 'Something went wrong. Try again.');
         setStage('new-creator');
       }
     } catch (e) {
