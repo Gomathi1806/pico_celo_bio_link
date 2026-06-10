@@ -129,6 +129,7 @@ export async function createCreatorWithLink(data: {
   displayName: string;
   purpose: string;
   price: string;
+  token?: string;
 }): Promise<{ success: boolean; linkId?: string; handle?: string; error?: string }> {
   try {
     const db = getDb();
@@ -177,6 +178,7 @@ export async function createCreatorWithLink(data: {
       description: '',
       price: priceDecimal,
       type: 'tip',
+      token: data.token ?? 'USDC',
     }).returning();
 
     revalidatePath('/dashboard');

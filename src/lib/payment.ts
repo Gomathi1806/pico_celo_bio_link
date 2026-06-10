@@ -2,11 +2,6 @@ import { createPublicClient, http, parseUnits, type Hash } from "viem";
 import { celo, celoAlfajores } from "viem/chains";
 import type { CeloNetwork } from "./minipay";
 
-export const CUSD_ADDRESS = {
-  celo: "0x765DE816845861e75A25fCA122bb6898B8B1282a" as `0x${string}`,
-  "celo-alfajores": "0x874069Fa1Eb16D44d622F2e0Ca25eeA172369bC1" as `0x${string}`,
-} as const;
-
 const TRANSFER_TOPIC =
   "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef" as `0x${string}`;
 
@@ -26,15 +21,18 @@ export async function verifyPayment({
   recipientAddress,
   requiredUsd,
   network,
+  tokenAddress,
+  tokenDecimals = 18,
 }: {
   txHash: Hash;
   recipientAddress: `0x${string}`;
   requiredUsd: number;
   network: CeloNetwork;
+  tokenAddress: `0x${string}`;
+  tokenDecimals?: number;
 }): Promise<PaymentResult> {
   const client = getClient(network);
-  const cusd = CUSD_ADDRESS[network];
-  const required = parseUnits(requiredUsd.toFixed(6), 18);
+  const required = parseUnits(requiredUsd.toFixed(tokenDecimals === 6 ? 6 : 6), tokenDecimals);
 
   let receipt: Awaited<ReturnType<typeof client.getTransactionReceipt>>;
   try {
@@ -49,7 +47,7 @@ export async function verifyPayment({
 
   for (const log of receipt.logs) {
     if (
-      log.address.toLowerCase() !== cusd.toLowerCase() ||
+      log.address.toLowerCase() !== tokenAddress.toLowerCase() ||
       log.topics[0] !== TRANSFER_TOPIC ||
       log.topics.length < 3
     ) continue;
@@ -62,8 +60,8 @@ export async function verifyPayment({
       const payer = ("0x" + log.topics[1]!.slice(26)) as `0x${string}`;
       return { valid: true, payer };
     }
-    return { valid: false, reason: `Underpayment: got ${amount}, need ${required}.` };
+    return { valid: false, reason: `Underpayment: received ${amount}, required ${required}.` };
   }
 
-  return { valid: false, reason: "No cUSD transfer to recipient found." };
+  return { valid: false, reason: `No ${tokenAddress} transfer to recipient found in transaction.` };
 }

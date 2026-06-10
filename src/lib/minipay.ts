@@ -3,6 +3,7 @@
 import { encodeFunctionData, parseUnits } from "viem";
 
 export type CeloNetwork = "celo" | "celo-alfajores";
+export type TokenSymbol = "USDC" | "cUSD" | "cEUR" | "cREAL";
 
 export const NETWORK: CeloNetwork =
   (process.env.NEXT_PUBLIC_CELO_NETWORK as CeloNetwork) ?? "celo-alfajores";
@@ -12,12 +13,59 @@ const CHAIN_MAP = {
   "celo-alfajores": { chainId: 44787, chainIdHex: "0xAEF3" as const },
 } as const;
 
+// Stablecoin contracts on Celo — USDC uses 6 decimals, the rest use 18
+export const TOKENS: Record<TokenSymbol, {
+  address: Record<CeloNetwork, `0x${string}`>;
+  decimals: number;
+  label: string;
+  symbol: string;
+}> = {
+  USDC: {
+    address: {
+      celo:             "0xcebA9300f2b948710d2653dD7B07f33A8B32118C",
+      "celo-alfajores": "0x2F25deB3848C207fc8E0c34035B3Ba7fC157602B",
+    },
+    decimals: 6,
+    label: "USDC",
+    symbol: "$",
+  },
+  cUSD: {
+    address: {
+      celo:             "0x765DE816845861e75A25fCA122bb6898B8B1282a",
+      "celo-alfajores": "0x874069Fa1Eb16D44d622F2e0Ca25eeA172369bC1",
+    },
+    decimals: 18,
+    label: "cUSD",
+    symbol: "$",
+  },
+  cEUR: {
+    address: {
+      celo:             "0xD8763CBa276a3738E6DE85b4b3bF5FDed6D6cA73",
+      "celo-alfajores": "0x10c892A6EC43a53E45D0B916B4b7D383B1b78d0F",
+    },
+    decimals: 18,
+    label: "cEUR",
+    symbol: "€",
+  },
+  cREAL: {
+    address: {
+      celo:             "0xe8537a3d056DA446677B9E9d6c5dB704EaAb4787",
+      "celo-alfajores": "0xE4D517785D091D3c54818832dB6094bcc2744545",
+    },
+    decimals: 18,
+    label: "cREAL",
+    symbol: "R$",
+  },
+};
+
+export const ALL_TOKENS: TokenSymbol[] = ["USDC", "cUSD", "cEUR", "cREAL"];
+export const DEFAULT_TOKEN: TokenSymbol = "USDC";
+
 export const CUSD = {
-  celo:             "0x765DE816845861e75A25fCA122bb6898B8B1282a" as `0x${string}`,
-  "celo-alfajores": "0x874069Fa1Eb16D44d622F2e0Ca25eeA172369bC1" as `0x${string}`,
+  celo:             TOKENS.cUSD.address.celo,
+  "celo-alfajores": TOKENS.cUSD.address["celo-alfajores"],
 } as const;
 
-// ERC20 transfer ABI (minimal)
 const ERC20_TRANSFER_ABI = [{
   name: "transfer",
   type: "function",
@@ -43,9 +91,7 @@ export async function detectMiniPay(timeoutMs = 2000): Promise<boolean> {
   return false;
 }
 
-export type ConnectedWallet = {
-  address: `0x${string}`;
-};
+export type ConnectedWallet = { address: `0x${string}` };
 
 let _address: `0x${string}` | null = null;
 
@@ -54,8 +100,6 @@ export async function connectMiniPay(): Promise<ConnectedWallet> {
   if (!provider) throw new Error("Open inside MiniPay to continue.");
 
   const { chainIdHex } = CHAIN_MAP[NETWORK];
-
-  // Ensure correct chain
   try {
     const current = (await provider.request({ method: "eth_chainId" })) as string;
     if (current.toLowerCase() !== chainIdHex.toLowerCase()) {
@@ -77,41 +121,40 @@ export async function connectMiniPay(): Promise<ConnectedWallet> {
 }
 
 /**
- * Send cUSD directly to a recipient address via MiniPay.
- * Returns the transaction hash once submitted.
+ * Send any supported stablecoin to a recipient via MiniPay.
+ * Handles decimals correctly: USDC=6 decimals, cUSD/cEUR/cREAL=18 decimals.
  */
-export async function sendCUSD(
+export async function sendToken(
   recipientAddress: `0x${string}`,
-  amountUsd: string
+  amountUsd: string,
+  token: TokenSymbol = DEFAULT_TOKEN
 ): Promise<`0x${string}`> {
   const provider = window.ethereum;
   if (!provider) throw new Error("MiniPay not found.");
 
   const { address } = await connectMiniPay();
-  const cusdContract = CUSD[NETWORK];
+  const { address: contractAddrs, decimals } = TOKENS[token];
+  const tokenContract = contractAddrs[NETWORK];
+  const amountWei = parseUnits(amountUsd, decimals);
 
-  // Convert USD amount to 18-decimal wei
-  const amountWei = parseUnits(amountUsd, 18);
-
-  // Encode ERC20 transfer(recipient, amount)
   const data = encodeFunctionData({
     abi: ERC20_TRANSFER_ABI,
     functionName: "transfer",
     args: [recipientAddress, amountWei],
   });
 
-  // Send transaction — MiniPay will show native confirmation UI
-  const txHash = (await provider.request({
+  return (await provider.request({
     method: "eth_sendTransaction",
-    params: [{
-      from: address,
-      to: cusdContract,
-      data,
-      // Gas: let MiniPay estimate (Celo fees are ~0.001 CELO)
-    }],
+    params: [{ from: address, to: tokenContract, data }],
   })) as `0x${string}`;
+}
 
-  return txHash;
+// Backward-compatible alias
+export async function sendCUSD(
+  recipientAddress: `0x${string}`,
+  amountUsd: string
+): Promise<`0x${string}`> {
+  return sendToken(recipientAddress, amountUsd, "cUSD");
 }
 
 export function disconnectMiniPay() {

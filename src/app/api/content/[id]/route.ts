@@ -70,12 +70,15 @@ export async function GET(
     return NextResponse.json({ error: 'Invalid payment proof.' }, { status: 400 });
   }
 
-  // Verify on-chain
+  // Verify on-chain (legacy x402 route uses cUSD)
+  const cusdAddress = CUSD[NETWORK] as `0x${string}`;
   const result = await verifyPayment({
     txHash,
     recipientAddress: OPERATOR,
     requiredUsd: parseFloat(link.price),
     network: NETWORK,
+    tokenAddress: cusdAddress,
+    tokenDecimals: 18,
   });
 
   if (!result.valid) {

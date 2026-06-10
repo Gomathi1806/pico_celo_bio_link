@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, use } from 'react';
 import Link from 'next/link';
-import { detectMiniPay, connectMiniPay, sendCUSD } from '@/lib/minipay';
+import { detectMiniPay, connectMiniPay, sendToken, TOKENS, ALL_TOKENS, DEFAULT_TOKEN, type TokenSymbol } from '@/lib/minipay';
 import { getLinkWithCreator, hasPurchased, recordPurchase } from '@/app/actions/creator';
 import type { PicoLink } from '@/db/schema';
 
@@ -11,18 +11,21 @@ const TYPE_EMOJI: Record<string, string> = {
   call: '🎯', audio: '🎙️', video: '🎬', other: '🎁',
 };
 
+const OPERATOR = process.env.NEXT_PUBLIC_OPERATOR_ADDRESS as `0x${string}` | undefined;
+const PLATFORM_FEE = 0.01; // 1%
+
 type UIState = 'loading' | 'no-minipay' | 'idle' | 'sending' | 'verifying' | 'unlocked' | 'already-owned';
 
 export default function SupportPage(props: { params: Promise<{ id: string }> }) {
   const { id } = use(props.params);
 
-  const [link, setLink]             = useState<PicoLink | null>(null);
+  const [link, setLink]               = useState<PicoLink | null>(null);
   const [creatorWallet, setCreatorWallet] = useState<`0x${string}` | ''>('');
-  const [creatorHandle, setCreatorHandle] = useState('');
-  const [state, setState]         = useState<UIState>('loading');
-  const [contentUrl, setContentUrl] = useState('');
-  const [thankYou, setThankYou]   = useState('');
-  const [errorMsg, setErrorMsg]   = useState('');
+  const [state, setState]             = useState<UIState>('loading');
+  const [contentUrl, setContentUrl]   = useState('');
+  const [thankYou, setThankYou]       = useState('');
+  const [errorMsg, setErrorMsg]       = useState('');
+  const [selectedToken, setSelectedToken] = useState<TokenSymbol>(DEFAULT_TOKEN);
 
   useEffect(() => {
     async function init() {
@@ -33,6 +36,9 @@ export default function SupportPage(props: { params: Promise<{ id: string }> }) 
       if (!result) { setState('idle'); return; }
       setLink(result.link);
       setCreatorWallet(result.creatorWallet);
+      // Use the creator's preferred token as default
+      const preferred = (result.link.token ?? DEFAULT_TOKEN) as TokenSymbol;
+      setSelectedToken(preferred);
 
       try {
         const { address } = await connectMiniPay();
@@ -55,25 +61,34 @@ export default function SupportPage(props: { params: Promise<{ id: string }> }) 
     setErrorMsg('');
 
     try {
-      // Step 1 — connect wallet & send cUSD
       setState('sending');
-      await connectMiniPay(); // ensures correct chain
-      // Payment goes directly to the creator's MiniPay wallet
-      const txHash = await sendCUSD(creatorWallet as `0x${string}`, link.price);
+      await connectMiniPay();
 
-      // Step 2 — verify on-chain (server waits for Celo confirmation)
+      const totalPrice  = parseFloat(link.price);
+      const creatorAmt  = (totalPrice * (1 - PLATFORM_FEE)).toFixed(6);
+      const platformAmt = (totalPrice * PLATFORM_FEE).toFixed(6);
+
+      // Step 1 — pay creator 99%
+      const txHash = await sendToken(creatorWallet as `0x${string}`, creatorAmt, selectedToken);
+
+      // Step 2 — collect 1% platform fee (best-effort, non-blocking)
+      if (OPERATOR) {
+        try {
+          await sendToken(OPERATOR, platformAmt, selectedToken);
+        } catch { /* fee rejected — don't block content unlock */ }
+      }
+
+      // Step 3 — verify on-chain
       setState('verifying');
       const res = await fetch(`/api/verify/${id}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ txHash }),
+        body: JSON.stringify({ txHash, token: selectedToken }),
       });
-
       const data = await res.json();
-
       if (!res.ok) throw new Error(data.error ?? `Verification failed (${res.status})`);
 
-      // Step 3 — record purchase & show content
+      // Step 4 — record purchase
       const { address } = await connectMiniPay();
       await recordPurchase({
         linkId: id,
@@ -88,7 +103,6 @@ export default function SupportPage(props: { params: Promise<{ id: string }> }) 
 
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Payment failed. Please try again.';
-      // Don't show error if user cancelled
       if (!msg.toLowerCase().includes('cancel') && !msg.toLowerCase().includes('denied')) {
         setErrorMsg(msg);
       }
@@ -113,7 +127,7 @@ export default function SupportPage(props: { params: Promise<{ id: string }> }) 
         <div style={{ fontSize: '2.5rem', marginBottom: '1rem' }}>📱</div>
         <h2 style={{ fontSize: '1.2rem', marginBottom: '0.75rem' }}>Open in MiniPay</h2>
         <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', lineHeight: 1.6, maxWidth: '260px', margin: '0 auto' }}>
-          This page accepts cUSD payments via Celo MiniPay. Open this link inside the MiniPay app to support this creator.
+          This page accepts stablecoin payments via Celo MiniPay. Open this link inside the MiniPay app to support this creator.
         </p>
       </div>
     );
@@ -123,17 +137,18 @@ export default function SupportPage(props: { params: Promise<{ id: string }> }) 
     return <div style={{ textAlign: 'center', padding: '6rem 0', color: 'var(--text-muted)' }}>Not found.</div>;
   }
 
-  const emoji  = TYPE_EMOJI[link.type] ?? '🎁';
-  const isTip  = !link.contentUrl;
+  const emoji    = TYPE_EMOJI[link.type] ?? '🎁';
+  const isTip    = !link.contentUrl;
   const isPaying = state === 'sending' || state === 'verifying';
+  const tokenMeta = TOKENS[selectedToken];
 
   const statusLabel = () => {
     if (state === 'sending')   return '⏳ Confirm in MiniPay…';
     if (state === 'verifying') return '🔗 Confirming on Celo…';
-    return `Support with MiniPay · $${link.price} cUSD`;
+    return `Pay ${tokenMeta.symbol}${link.price} ${selectedToken}`;
   };
 
-  // ── Thank you ──
+  // ── Thank you / unlocked ──
   if (state === 'unlocked' || state === 'already-owned') {
     return (
       <div className="animate-fade" style={{ textAlign: 'center', paddingTop: '3rem' }}>
@@ -144,7 +159,7 @@ export default function SupportPage(props: { params: Promise<{ id: string }> }) 
           {state === 'already-owned' ? 'You already supported!' : 'Thank you so much!'}
         </h2>
         <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', lineHeight: 1.6, marginBottom: '2rem' }}>
-          {thankYou || `Your support means the world! You paid $${link.price} cUSD.`}
+          {thankYou || `Your support means the world!`}
         </p>
 
         {contentUrl && (
@@ -152,39 +167,27 @@ export default function SupportPage(props: { params: Promise<{ id: string }> }) 
             <p style={{ color: 'var(--text-muted)', fontSize: '0.78rem', marginBottom: '1rem' }}>
               🎁 Here&apos;s what you unlocked:
             </p>
-            <a
-              href={contentUrl}
-              target="_blank"
-              rel="noopener noreferrer"
+            <a href={contentUrl} target="_blank" rel="noopener noreferrer"
               className="btn btn-primary"
-              style={{ display: 'block', textDecoration: 'none', width: '100%' }}
-            >
+              style={{ display: 'block', textDecoration: 'none', width: '100%' }}>
               {emoji} Open {link.title}
             </a>
           </div>
         )}
 
-        {creatorHandle && (
-          <Link
-            href={`/@${creatorHandle}`}
-            className="btn btn-secondary"
-            style={{ textDecoration: 'none', display: 'block', width: '100%' }}
-          >
-            ← Back to @{creatorHandle}
-          </Link>
-        )}
+        <Link href="/" className="btn btn-secondary"
+          style={{ textDecoration: 'none', display: 'block', width: '100%' }}>
+          ← Back to Pico
+        </Link>
       </div>
     );
   }
 
-  // ── Main support screen ──
+  // ── Main payment screen ──
   return (
     <div className="animate-fade">
       <div style={{ marginBottom: '1.5rem' }}>
-        <Link
-          href={creatorHandle ? `/@${creatorHandle}` : '/'}
-          style={{ color: 'var(--text-muted)', textDecoration: 'none', fontSize: '0.85rem' }}
-        >
+        <Link href="/" style={{ color: 'var(--text-muted)', textDecoration: 'none', fontSize: '0.85rem' }}>
           ← Back
         </Link>
       </div>
@@ -201,17 +204,39 @@ export default function SupportPage(props: { params: Promise<{ id: string }> }) 
           </p>
         )}
 
-        {/* Price pill */}
+        {/* Price */}
         <div style={{
           display: 'inline-flex', alignItems: 'baseline', gap: '0.3rem',
           background: 'rgba(53,208,127,0.1)', border: '1px solid rgba(53,208,127,0.25)',
-          borderRadius: '100px', padding: '0.5rem 1.25rem', marginBottom: '1.75rem',
+          borderRadius: '100px', padding: '0.5rem 1.25rem', marginBottom: '1.5rem',
         }}>
           <span style={{ fontSize: '1.6rem', fontWeight: 800, color: 'var(--accent-celo)' }}>
-            ${link.price}
+            {tokenMeta.symbol}{link.price}
           </span>
-          <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>cUSD</span>
+          <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>{selectedToken}</span>
         </div>
+
+        {/* Token selector */}
+        {!isPaying && (
+          <div style={{ marginBottom: '1.5rem' }}>
+            <p style={{ color: 'var(--text-muted)', fontSize: '0.72rem', fontWeight: 700, letterSpacing: '0.08em', marginBottom: '0.5rem' }}>
+              PAY WITH
+            </p>
+            <div style={{ display: 'flex', gap: '0.4rem', justifyContent: 'center', flexWrap: 'wrap' }}>
+              {ALL_TOKENS.map(t => (
+                <button key={t} onClick={() => setSelectedToken(t)}
+                  style={{
+                    padding: '0.4rem 0.9rem', borderRadius: '100px', fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer',
+                    background: selectedToken === t ? 'var(--accent-celo)' : 'rgba(255,255,255,0.06)',
+                    border: `1px solid ${selectedToken === t ? 'var(--accent-celo)' : 'var(--card-border)'}`,
+                    color: selectedToken === t ? '#0a1a12' : 'white',
+                  }}>
+                  {t}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
 
         {isTip ? (
           <p style={{ color: 'var(--text-muted)', fontSize: '0.78rem', marginBottom: '1.5rem' }}>
@@ -230,18 +255,14 @@ export default function SupportPage(props: { params: Promise<{ id: string }> }) 
           onClick={handlePay}
           disabled={isPaying}
         >
-          {isPaying ? (
-            <><div className="spinner" />{statusLabel()}</>
-          ) : statusLabel()}
+          {isPaying ? <><div className="spinner" />{statusLabel()}</> : statusLabel()}
         </button>
 
         {errorMsg && (
-          <p style={{ color: '#ef4444', fontSize: '0.82rem', marginTop: '1rem' }}>
-            {errorMsg}
-          </p>
+          <p style={{ color: '#ef4444', fontSize: '0.82rem', marginTop: '1rem' }}>{errorMsg}</p>
         )}
 
-        {/* Step indicators when paying */}
+        {/* Step indicators while paying */}
         {isPaying && (
           <div style={{ marginTop: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', justifyContent: 'center' }}>
@@ -257,16 +278,20 @@ export default function SupportPage(props: { params: Promise<{ id: string }> }) 
           </div>
         )}
 
+        {/* Trust signals */}
         {!isPaying && (
           <div style={{ marginTop: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
             <p style={{ color: 'var(--text-muted)', fontSize: '0.68rem' }}>
-              ⚡ Instant · 🔐 cUSD on Celo · ~$0.001 gas
+              ⚡ Instant · 🔐 On-chain Celo · ~$0.001 gas
             </p>
             {link.salesCount > 0 && (
               <p style={{ color: 'var(--accent-celo)', fontSize: '0.68rem', fontWeight: 700 }}>
                 ✓ {link.salesCount} person{link.salesCount !== 1 ? 's' : ''} already supported
               </p>
             )}
+            <p style={{ color: 'var(--text-muted)', fontSize: '0.65rem' }}>
+              1% platform fee · 99% goes directly to creator
+            </p>
           </div>
         )}
       </div>

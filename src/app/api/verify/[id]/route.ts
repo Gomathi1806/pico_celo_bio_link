@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getLinkWithCreator } from "@/app/actions/creator";
 import { verifyPayment } from "@/lib/payment";
-import type { CeloNetwork } from "@/lib/minipay";
+import { TOKENS, DEFAULT_TOKEN, type CeloNetwork, type TokenSymbol } from "@/lib/minipay";
 
 const NETWORK = (process.env.NEXT_PUBLIC_CELO_NETWORK ?? "celo-alfajores") as CeloNetwork;
+const PLATFORM_FEE = 0.01; // 1%
 
 export async function POST(
   req: NextRequest,
@@ -12,38 +13,52 @@ export async function POST(
   const { id } = await context.params;
 
   let txHash: `0x${string}`;
+  let token: TokenSymbol;
   try {
     const body = await req.json();
     txHash = body.txHash;
+    token = (body.token as TokenSymbol) ?? DEFAULT_TOKEN;
     if (!txHash) throw new Error("missing txHash");
   } catch {
     return NextResponse.json({ error: "txHash required" }, { status: 400 });
   }
 
-  // Look up link + creator wallet from DB
   const found = await getLinkWithCreator(id);
   if (!found) return NextResponse.json({ error: "Content not found" }, { status: 404 });
 
   const { link, creatorWallet } = found;
 
-  console.log(`[verify/${id}] checking tx ${txHash} → creator ${creatorWallet} for $${link.price} cUSD`);
+  // Creator receives 99% — verify that amount hit their wallet
+  const creatorAmount = parseFloat(link.price) * (1 - PLATFORM_FEE);
+  const tokenMeta = TOKENS[token];
 
-  // Wait up to 30s for the tx to confirm on Celo (blocks ~5s)
+  if (!tokenMeta) {
+    return NextResponse.json({ error: `Unsupported token: ${token}` }, { status: 400 });
+  }
+
+  const tokenAddress = tokenMeta.address[NETWORK];
+
+  console.log(`[verify/${id}] tx ${txHash} | token ${token} | creator ${creatorWallet} | expected ${creatorAmount}`);
+
   let result = await verifyPayment({
     txHash,
     recipientAddress: creatorWallet,
-    requiredUsd: parseFloat(link.price),
+    requiredUsd: creatorAmount,
     network: NETWORK,
+    tokenAddress,
+    tokenDecimals: tokenMeta.decimals,
   });
 
-  // Retry once after 5s if tx not yet mined
+  // Retry once after 5s if block not yet mined (~5s on Celo)
   if (!result.valid && result.reason.includes("not found")) {
     await new Promise((r) => setTimeout(r, 5000));
     result = await verifyPayment({
       txHash,
       recipientAddress: creatorWallet,
-      requiredUsd: parseFloat(link.price),
+      requiredUsd: creatorAmount,
       network: NETWORK,
+      tokenAddress,
+      tokenDecimals: tokenMeta.decimals,
     });
   }
 

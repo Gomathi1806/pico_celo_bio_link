@@ -17,6 +17,7 @@ export const picoLinks = pgTable('pico_links', {
   contentUrl: text('content_url'),              // null = tip only (no reward)
   thankYouMessage: text('thank_you_message'),   // shown after payment
   type: text('type').notNull().default('tip'),  // tip | coffee | pdf | guide | call | other
+  token: text('token').notNull().default('USDC'), // USDC | cUSD | cEUR | cREAL
   salesCount: integer('sales_count').notNull().default(0),
   totalEarnings: decimal('total_earnings', { precision: 10, scale: 2 }).notNull().default('0'),
   createdAt: timestamp('created_at').defaultNow(),

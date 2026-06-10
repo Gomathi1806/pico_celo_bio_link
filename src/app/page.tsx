@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { detectMiniPay, connectMiniPay } from '@/lib/minipay';
+import { detectMiniPay, connectMiniPay, ALL_TOKENS, DEFAULT_TOKEN, type TokenSymbol } from '@/lib/minipay';
 import { createCreatorWithLink, getCreatorByWallet, getCreatorLinks } from '@/app/actions/creator';
 import type { Creator, PicoLink } from '@/db/schema';
 
@@ -31,6 +31,7 @@ export default function HomePage() {
   const [purpose, setPurpose]   = useState('');
   const [price, setPrice]       = useState('2');
   const [customPrice, setCustomPrice] = useState('');
+  const [token, setToken]       = useState<TokenSymbol>(DEFAULT_TOKEN);
   const [error, setError]       = useState('');
   const [copied, setCopied]     = useState(false);
 
@@ -79,6 +80,7 @@ export default function HomePage() {
         displayName: name.trim(),
         purpose: purpose.trim(),
         price: finalPrice,
+        token,
       });
       if (res.success && res.linkId) {
         setNewLinkId(res.linkId);
@@ -332,7 +334,7 @@ export default function HomePage() {
         <div style={{ fontSize: '2.5rem', marginBottom: '0.5rem' }}>🍵</div>
         <h1 style={{ fontSize: '1.5rem', fontWeight: 800, marginBottom: '0.4rem' }}>Create Your Page</h1>
         <p style={{ color: 'var(--text-muted)', fontSize: '0.88rem', lineHeight: 1.5 }}>
-          Set up once. Share your link. Get paid in cUSD.
+          Set up once. Share your link. Get paid in USDC, cUSD, cEUR or cREAL.
         </p>
       </header>
 
@@ -376,9 +378,9 @@ export default function HomePage() {
         </div>
 
         {/* Price */}
-        <div style={{ marginBottom: '1.75rem' }}>
+        <div style={{ marginBottom: '1.25rem' }}>
           <label style={{ display: 'block', color: 'var(--text-muted)', fontSize: '0.72rem', fontWeight: 700, letterSpacing: '0.08em', marginBottom: '0.5rem' }}>
-            PRICE (cUSD)
+            PRICE
           </label>
           <div style={{ display: 'flex', gap: '0.5rem' }}>
             {PRICE_PRESETS.map(p => (
@@ -400,6 +402,29 @@ export default function HomePage() {
             onChange={e => { setCustomPrice(e.target.value); setPrice(''); }}
             style={{ width: '100%', marginTop: '0.6rem', padding: '0.7rem', borderRadius: '12px', border: '1px solid var(--card-border)', background: 'transparent', textAlign: 'center', fontSize: '0.95rem', boxSizing: 'border-box' }}
           />
+        </div>
+
+        {/* Token */}
+        <div style={{ marginBottom: '1.75rem' }}>
+          <label style={{ display: 'block', color: 'var(--text-muted)', fontSize: '0.72rem', fontWeight: 700, letterSpacing: '0.08em', marginBottom: '0.5rem' }}>
+            ACCEPT PAYMENT IN
+          </label>
+          <div style={{ display: 'flex', gap: '0.5rem' }}>
+            {ALL_TOKENS.map(t => (
+              <button key={t} onClick={() => setToken(t)}
+                style={{
+                  flex: 1, padding: '0.6rem 0', borderRadius: '12px', fontSize: '0.82rem', fontWeight: 700, cursor: 'pointer',
+                  background: token === t ? 'var(--accent-celo)' : 'rgba(255,255,255,0.05)',
+                  border: `1px solid ${token === t ? 'var(--accent-celo)' : 'var(--card-border)'}`,
+                  color: token === t ? '#0a1a12' : 'white',
+                }}>
+                {t}
+              </button>
+            ))}
+          </div>
+          <p style={{ color: 'var(--text-muted)', fontSize: '0.7rem', marginTop: '0.4rem' }}>
+            Fan can also choose a different token at payment time
+          </p>
         </div>
 
         {error && <p style={{ color: '#ef4444', fontSize: '0.85rem', marginBottom: '1rem' }}>{error}</p>}
