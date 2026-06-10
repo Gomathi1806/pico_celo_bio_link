@@ -132,6 +132,16 @@ export async function createCreatorWithLink(data: {
   token?: string;
 }): Promise<{ success: boolean; linkId?: string; handle?: string; error?: string }> {
   try {
+    // Validate wallet address
+    if (!/^0x[0-9a-fA-F]{40}$/.test(data.walletAddress)) {
+      return { success: false, error: 'Invalid wallet address.' };
+    }
+    // Validate price
+    const priceNum = parseFloat(data.price);
+    if (!isFinite(priceNum) || priceNum <= 0 || priceNum > 10000) {
+      return { success: false, error: 'Price must be between $0.01 and $10,000.' };
+    }
+
     const db = getDb();
     const wallet = data.walletAddress.toLowerCase();
 
@@ -144,10 +154,16 @@ export async function createCreatorWithLink(data: {
       .slice(0, 18) || 'creator';
 
     // Pick a handle that isn't taken by a different wallet
-    const walletSuffix = wallet.slice(2, 6); // 4 hex chars from wallet
-    const candidates = [base, `${base}_${walletSuffix}`, `${base}${Math.floor(Math.random() * 9000 + 1000)}`];
+    // Last candidate uses 8 chars of wallet address — collision-proof
+    const walletSuffix = wallet.slice(2, 6);
+    const candidates = [
+      base,
+      `${base}_${walletSuffix}`,
+      `${base}${Math.floor(Math.random() * 9000 + 1000)}`,
+      `user_${wallet.slice(2, 10)}`, // guaranteed unique — derived from wallet
+    ];
 
-    let handle = base;
+    let handle = candidates[candidates.length - 1]!; // safe fallback
     for (const candidate of candidates) {
       const existing = await db.query.creators.findFirst({ where: eq(creators.handle, candidate) });
       if (!existing || existing.walletAddress === wallet) {

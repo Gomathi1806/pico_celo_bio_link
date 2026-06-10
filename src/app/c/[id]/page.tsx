@@ -62,7 +62,8 @@ export default function SupportPage(props: { params: Promise<{ id: string }> }) 
 
     try {
       setState('sending');
-      await connectMiniPay();
+      // Capture address once — reuse for purchase recording (avoids account-switch race)
+      const { address } = await connectMiniPay();
 
       const totalPrice  = parseFloat(link.price);
       const creatorAmt  = (totalPrice * (1 - PLATFORM_FEE)).toFixed(6);
@@ -75,7 +76,7 @@ export default function SupportPage(props: { params: Promise<{ id: string }> }) 
       if (OPERATOR) {
         try {
           await sendToken(OPERATOR, platformAmt, selectedToken);
-        } catch { /* fee rejected — don't block content unlock */ }
+        } catch { /* fee declined — don't block content unlock */ }
       }
 
       // Step 3 — verify on-chain
@@ -88,8 +89,7 @@ export default function SupportPage(props: { params: Promise<{ id: string }> }) 
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? `Verification failed (${res.status})`);
 
-      // Step 4 — record purchase
-      const { address } = await connectMiniPay();
+      // Step 4 — record purchase (use address captured at payment time)
       await recordPurchase({
         linkId: id,
         buyerAddress: address,

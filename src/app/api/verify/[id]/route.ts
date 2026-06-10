@@ -23,6 +23,15 @@ export async function POST(
     return NextResponse.json({ error: "txHash required" }, { status: 400 });
   }
 
+  // Validate txHash is a well-formed 0x-prefixed 32-byte hex hash
+  if (!/^0x[0-9a-fA-F]{64}$/.test(txHash)) {
+    return NextResponse.json({ error: "Invalid transaction hash format." }, { status: 400 });
+  }
+  // Validate token is one we support
+  if (!(token in TOKENS)) {
+    return NextResponse.json({ error: `Unsupported token: ${token}` }, { status: 400 });
+  }
+
   const found = await getLinkWithCreator(id);
   if (!found) return NextResponse.json({ error: "Content not found" }, { status: 404 });
 

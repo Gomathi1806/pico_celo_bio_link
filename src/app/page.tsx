@@ -261,15 +261,21 @@ export default function HomePage() {
               const finalPrice = customPrice || price;
               if (!purpose.trim() || !finalPrice) return;
               setStage('creating');
-              const { address } = await connectMiniPay();
-              const res = await createCreatorWithLink({
-                walletAddress: address,
-                displayName: creator.handle,
-                purpose: purpose.trim(),
-                price: finalPrice,
-              });
-              if (res.success && res.linkId) { setNewLinkId(res.linkId); setStage('done'); }
-              else { setStage('returning'); }
+              try {
+                const { address } = await connectMiniPay();
+                const res = await createCreatorWithLink({
+                  walletAddress: address,
+                  displayName: creator.handle,
+                  purpose: purpose.trim(),
+                  price: finalPrice,
+                  token,
+                });
+                if (res.success && res.linkId) { setNewLinkId(res.linkId); setStage('done'); }
+                else { setError(res.error ?? 'Failed. Try again.'); setStage('returning'); }
+              } catch (e) {
+                setError(e instanceof Error ? e.message : 'Failed. Try again.');
+                setStage('returning');
+              }
             }}
           >
             Create Link

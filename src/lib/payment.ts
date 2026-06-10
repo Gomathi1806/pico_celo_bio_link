@@ -32,7 +32,8 @@ export async function verifyPayment({
   tokenDecimals?: number;
 }): Promise<PaymentResult> {
   const client = getClient(network);
-  const required = parseUnits(requiredUsd.toFixed(tokenDecimals === 6 ? 6 : 6), tokenDecimals);
+  // Use 6 decimal places for USD amounts — more than sufficient precision for all supported tokens
+  const required = parseUnits(requiredUsd.toFixed(6), tokenDecimals);
 
   let receipt: Awaited<ReturnType<typeof client.getTransactionReceipt>>;
   try {
