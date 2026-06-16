@@ -10,7 +10,7 @@ export const dynamic = "force-dynamic";
 export async function GET() {
   const checks: Record<string, string> = {
     DATABASE_URL: process.env.DATABASE_URL ? "✓ set" : "✗ MISSING",
-    NEXT_PUBLIC_CELO_NETWORK: process.env.NEXT_PUBLIC_CELO_NETWORK ?? "(not set — defaults to celo-alfajores)",
+    NEXT_PUBLIC_CELO_NETWORK: `✓ ${process.env.NEXT_PUBLIC_CELO_NETWORK ?? "celo-alfajores (default)"}`,
   };
 
   try {
