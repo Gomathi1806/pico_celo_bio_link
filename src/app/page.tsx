@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { detectMiniPay, connectMiniPay, ALL_TOKENS, DEFAULT_TOKEN, type TokenSymbol } from '@/lib/minipay';
+import { detectWallet, connectMiniPay, ALL_TOKENS, DEFAULT_TOKEN, type TokenSymbol } from '@/lib/minipay';
 import { createCreatorWithLink, getCreatorByWallet, getCreatorLinks } from '@/app/actions/creator';
 import type { Creator, PicoLink } from '@/db/schema';
 
@@ -36,7 +36,7 @@ export default function HomePage() {
   const [copied, setCopied]     = useState(false);
 
   useEffect(() => {
-    detectMiniPay().then(async (found) => {
+    detectWallet().then(async (found) => {
       if (!found) { setStage('no-minipay'); return; }
       try {
         const { address } = await connectMiniPay();
@@ -146,9 +146,10 @@ export default function HomePage() {
 
         {/* NO external links here — they cause MiniPay to navigate home */}
         <div className="glass" style={{ padding: '1.25rem', background: 'rgba(53,208,127,0.05)', border: '1px solid rgba(53,208,127,0.2)' }}>
-          <p style={{ fontWeight: 700, marginBottom: '0.3rem' }}>Open this page in MiniPay</p>
-          <p style={{ color: 'var(--text-muted)', fontSize: '0.82rem' }}>
-            Download MiniPay from the Opera Mini app, then open this URL inside it.
+          <p style={{ fontWeight: 700, marginBottom: '0.3rem' }}>No wallet detected</p>
+          <p style={{ color: 'var(--text-muted)', fontSize: '0.82rem', lineHeight: 1.5 }}>
+            Open this page inside MiniPay, or in a browser with a wallet extension
+            (e.g. MetaMask) connected to the Celo network to try it out.
           </p>
         </div>
       </div>

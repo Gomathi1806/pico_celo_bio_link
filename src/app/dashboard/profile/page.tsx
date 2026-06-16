@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { detectMiniPay, connectMiniPay } from '@/lib/minipay';
+import { detectWallet, connectMiniPay } from '@/lib/minipay';
 import { getCreatorByWallet, updateCreatorBio } from '@/app/actions/creator';
 
 export default function ProfilePage() {
@@ -14,7 +14,7 @@ export default function ProfilePage() {
   const [walletAddress, setWalletAddress] = useState('');
 
   useEffect(() => {
-    detectMiniPay().then(async (found) => {
+    detectWallet().then(async (found) => {
       if (!found) { router.replace('/dashboard'); return; }
       const { address } = await connectMiniPay();
       setWalletAddress(address);

@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
-import { detectMiniPay, connectMiniPay, disconnectMiniPay } from '@/lib/minipay';
+import { detectWallet, connectMiniPay, disconnectMiniPay } from '@/lib/minipay';
 import { getOrCreateCreator, getCreatorLinks, getCreatorEarnings } from '@/app/actions/creator';
 import type { Creator, PicoLink } from '@/db/schema';
 
@@ -31,7 +31,7 @@ export default function DashboardPage() {
   }, []);
 
   useEffect(() => {
-    detectMiniPay().then(async (found) => {
+    detectWallet().then(async (found) => {
       if (!found) { setStep('no-minipay'); return; }
       try {
         const { address } = await connectMiniPay();

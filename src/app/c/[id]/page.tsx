@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, use } from 'react';
 import Link from 'next/link';
-import { detectMiniPay, connectMiniPay, sendToken, TOKENS, ALL_TOKENS, DEFAULT_TOKEN, type TokenSymbol } from '@/lib/minipay';
+import { detectWallet, connectMiniPay, sendToken, TOKENS, ALL_TOKENS, DEFAULT_TOKEN, type TokenSymbol } from '@/lib/minipay';
 import { getLinkWithCreator, hasPurchased, recordPurchase } from '@/app/actions/creator';
 import type { PicoLink } from '@/db/schema';
 
@@ -29,7 +29,7 @@ export default function SupportPage(props: { params: Promise<{ id: string }> }) 
 
   useEffect(() => {
     async function init() {
-      const found = await detectMiniPay();
+      const found = await detectWallet();
       if (!found) { setState('no-minipay'); return; }
 
       const result = await getLinkWithCreator(id);
@@ -120,14 +120,14 @@ export default function SupportPage(props: { params: Promise<{ id: string }> }) 
     );
   }
 
-  // ── No MiniPay ──
+  // ── No wallet found ──
   if (state === 'no-minipay') {
     return (
       <div className="animate-fade" style={{ textAlign: 'center', paddingTop: '5rem' }}>
         <div style={{ fontSize: '2.5rem', marginBottom: '1rem' }}>📱</div>
-        <h2 style={{ fontSize: '1.2rem', marginBottom: '0.75rem' }}>Open in MiniPay</h2>
+        <h2 style={{ fontSize: '1.2rem', marginBottom: '0.75rem' }}>No wallet detected</h2>
         <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', lineHeight: 1.6, maxWidth: '260px', margin: '0 auto' }}>
-          This page accepts stablecoin payments via Celo MiniPay. Open this link inside the MiniPay app to support this creator.
+          This page accepts stablecoin payments via Celo. Open this link inside MiniPay, or in a browser with a wallet extension (e.g. MetaMask) connected to Celo, to support this creator.
         </p>
       </div>
     );

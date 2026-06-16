@@ -91,6 +91,21 @@ export async function detectMiniPay(timeoutMs = 2000): Promise<boolean> {
   return false;
 }
 
+/**
+ * Detects MiniPay OR any other injected EVM wallet (MetaMask, Valora, etc).
+ * Lets reviewers/testers use the app in a regular desktop or mobile browser
+ * without MiniPay installed — MiniPay-specific UX still kicks in via isMiniPay().
+ */
+export async function detectWallet(timeoutMs = 2000): Promise<boolean> {
+  if (typeof window === "undefined") return false;
+  const start = Date.now();
+  while (Date.now() - start < timeoutMs) {
+    if (window.ethereum) return true;
+    await new Promise((r) => setTimeout(r, 100));
+  }
+  return false;
+}
+
 export type ConnectedWallet = { address: `0x${string}` };
 
 let _address: `0x${string}` | null = null;
