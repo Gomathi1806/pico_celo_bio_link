@@ -9,8 +9,8 @@ export const NETWORK: CeloNetwork =
   (process.env.NEXT_PUBLIC_CELO_NETWORK as CeloNetwork) ?? "celo-alfajores";
 
 const CHAIN_MAP = {
-  celo:             { chainId: 42220, chainIdHex: "0xA4EC" as const },
-  "celo-alfajores": { chainId: 44787, chainIdHex: "0xAEF3" as const },
+  celo:             { chainId: 42220, chainIdHex: "0xa4ec" as const },
+  "celo-alfajores": { chainId: 44787, chainIdHex: "0xaef3" as const },
 } as const;
 
 // Stablecoin contracts on Celo — USDC uses 6 decimals, the rest use 18
@@ -114,18 +114,46 @@ export async function connectMiniPay(): Promise<ConnectedWallet> {
   const provider = window.ethereum;
   if (!provider) throw new Error("No wallet extension detected.");
 
+  const accounts = (await provider.request({
+    method: "eth_requestAccounts",
+  })) as `0x${string}`[];
+
+  const address = accounts[0];
+  if (!address) throw new Error("No wallet address returned.");
+  _address = address;
+
   const { chainIdHex } = CHAIN_MAP[NETWORK];
   try {
-    const current = (await provider.request({ method: "eth_chainId" })) as string;
-    if (current.toLowerCase() !== chainIdHex.toLowerCase()) {
+    const current = (await provider.request({ method: "eth_chainId" }));
+    let currentChainId: number;
+    if (typeof current === "number") {
+      currentChainId = current;
+    } else if (typeof current === "string") {
+      if (current.startsWith("0x")) {
+        currentChainId = parseInt(current, 16);
+      } else {
+        currentChainId = parseInt(current, 10);
+      }
+    } else {
+      currentChainId = parseInt(String(current), 16);
+    }
+
+    if (currentChainId !== CHAIN_MAP[NETWORK].chainId) {
       try {
         await provider.request({
           method: "wallet_switchEthereumChain",
           params: [{ chainId: chainIdHex }],
         });
       } catch (switchError: any) {
-        // Error code 4902 indicates that the chain has not been added to the wallet.
-        if (switchError.code === 4902 || switchError.data?.originalError?.code === 4902) {
+        // Check standard 4902 error codes or message contents indicating missing chain configuration
+        const isChainMissing = 
+          switchError.code === 4902 || 
+          switchError.data?.originalError?.code === 4902 ||
+          switchError.data?.code === 4902 ||
+          switchError.message?.toLowerCase().includes("unrecognized") ||
+          switchError.message?.toLowerCase().includes("added");
+
+        if (isChainMissing) {
           await provider.request({
             method: "wallet_addEthereumChain",
             params: [
@@ -155,18 +183,11 @@ export async function connectMiniPay(): Promise<ConnectedWallet> {
         }
       }
     }
-  } catch (err) {
+  } catch (err: any) {
     console.error("Failed to switch/add network", err);
-    throw new Error("Please switch your wallet network to Celo to continue.");
+    throw new Error(err?.message ?? "Please switch your wallet network to Celo to continue.");
   }
 
-  const accounts = (await provider.request({
-    method: "eth_requestAccounts",
-  })) as `0x${string}`[];
-
-  const address = accounts[0];
-  if (!address) throw new Error("No wallet address returned.");
-  _address = address;
   return { address };
 }
 
