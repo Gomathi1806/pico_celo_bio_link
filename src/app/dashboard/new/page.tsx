@@ -31,10 +31,14 @@ export default function NewItemPage() {
   useEffect(() => {
     detectWallet().then(async (found) => {
       if (!found) { router.replace('/dashboard'); return; }
-      const { address } = await connectMiniPay();
-      const creator = await getCreatorByWallet(address);
-      if (!creator) { router.replace('/dashboard'); return; }
-      setCreatorId(creator.id);
+      try {
+        const { address } = await connectMiniPay();
+        const creator = await getCreatorByWallet(address);
+        if (!creator) { router.replace('/dashboard'); return; }
+        setCreatorId(creator.id);
+      } catch {
+        router.replace('/dashboard');
+      }
     });
   }, [router]);
 
@@ -54,7 +58,7 @@ export default function NewItemPage() {
   const handleSubmit = async () => {
     if (!title || !price || !creatorId) { setError('Please fill in a title and price.'); return; }
     const p = parseFloat(price);
-    if (isNaN(p) || p < 0.01) { setError('Minimum price is $0.01 cUSD.'); return; }
+    if (isNaN(p) || p < 0.01) { setError('Minimum price is $0.01.'); return; }
     if (!isTip && !contentUrl) { setError('Please add a content URL (the link you\'ll share after payment).'); return; }
 
     setSaving(true);
@@ -138,7 +142,7 @@ export default function NewItemPage() {
         {/* Price */}
         <div>
           <label style={{ display: 'block', color: 'var(--text-muted)', fontSize: '0.72rem', fontWeight: 700, letterSpacing: '0.08em', marginBottom: '0.5rem' }}>
-            PRICE (cUSD)
+            PRICE (USD value)
           </label>
           <div style={{ position: 'relative' }}>
             <span style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }}>$</span>

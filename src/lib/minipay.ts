@@ -35,7 +35,7 @@ export const TOKENS: Record<TokenSymbol, {
       "celo-alfajores": "0x874069Fa1Eb16D44d622F2e0Ca25eeA172369bC1",
     },
     decimals: 18,
-    label: "cUSD",
+    label: "USDm",
     symbol: "$",
   },
   cEUR: {
@@ -44,7 +44,7 @@ export const TOKENS: Record<TokenSymbol, {
       "celo-alfajores": "0x10c892A6EC43a53E45D0B916B4b7D383B1b78d0F",
     },
     decimals: 18,
-    label: "cEUR",
+    label: "EURm",
     symbol: "€",
   },
   cREAL: {
@@ -53,7 +53,7 @@ export const TOKENS: Record<TokenSymbol, {
       "celo-alfajores": "0xE4D517785D091D3c54818832dB6094bcc2744545",
     },
     decimals: 18,
-    label: "cREAL",
+    label: "BRLm",
     symbol: "R$",
   },
 };
@@ -112,18 +112,53 @@ let _address: `0x${string}` | null = null;
 
 export async function connectMiniPay(): Promise<ConnectedWallet> {
   const provider = window.ethereum;
-  if (!provider) throw new Error("Open inside MiniPay to continue.");
+  if (!provider) throw new Error("No wallet extension detected.");
 
   const { chainIdHex } = CHAIN_MAP[NETWORK];
   try {
     const current = (await provider.request({ method: "eth_chainId" })) as string;
     if (current.toLowerCase() !== chainIdHex.toLowerCase()) {
-      await provider.request({
-        method: "wallet_switchEthereumChain",
-        params: [{ chainId: chainIdHex }],
-      });
+      try {
+        await provider.request({
+          method: "wallet_switchEthereumChain",
+          params: [{ chainId: chainIdHex }],
+        });
+      } catch (switchError: any) {
+        // Error code 4902 indicates that the chain has not been added to the wallet.
+        if (switchError.code === 4902 || switchError.data?.originalError?.code === 4902) {
+          await provider.request({
+            method: "wallet_addEthereumChain",
+            params: [
+              {
+                chainId: chainIdHex,
+                chainName: NETWORK === "celo" ? "Celo Mainnet" : "Celo Alfajores Testnet",
+                nativeCurrency: {
+                  name: "CELO",
+                  symbol: "CELO",
+                  decimals: 18,
+                },
+                rpcUrls: [
+                  NETWORK === "celo"
+                    ? "https://forno.celo.org"
+                    : "https://alfajores-forno.celo-testnet.org",
+                ],
+                blockExplorerUrls: [
+                  NETWORK === "celo"
+                    ? "https://celoscan.io"
+                    : "https://alfajores.celoscan.io",
+                ],
+              },
+            ],
+          });
+        } else {
+          throw switchError;
+        }
+      }
     }
-  } catch { /* proceed */ }
+  } catch (err) {
+    console.error("Failed to switch/add network", err);
+    throw new Error("Please switch your wallet network to Celo to continue.");
+  }
 
   const accounts = (await provider.request({
     method: "eth_requestAccounts",
@@ -145,7 +180,7 @@ export async function sendToken(
   token: TokenSymbol = DEFAULT_TOKEN
 ): Promise<`0x${string}`> {
   const provider = window.ethereum;
-  if (!provider) throw new Error("MiniPay not found.");
+  if (!provider) throw new Error("Wallet not found.");
 
   const { address } = await connectMiniPay();
   const { address: contractAddrs, decimals } = TOKENS[token];

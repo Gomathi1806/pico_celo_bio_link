@@ -10,6 +10,13 @@ const TYPE_EMOJI: Record<string, string> = {
   call: '🎯', audio: '🎙️', video: '🎬', other: '🎁',
 };
 
+const TOKEN_LABELS: Record<string, string> = {
+  USDC: 'USDC',
+  cUSD: 'USDm',
+  cEUR: 'EURm',
+  cREAL: 'BRLm',
+};
+
 export default async function CreatorBioPage(props: { params: Promise<{ handle: string }> }) {
   const { handle } = await props.params;
   const creator = await getCreatorByHandle(handle);
@@ -94,7 +101,7 @@ export default async function CreatorBioPage(props: { params: Promise<{ handle: 
                     <div style={{ fontWeight: 800, fontSize: '1.1rem', color: 'var(--accent-celo)' }}>
                       ${link.price}
                     </div>
-                    <div style={{ color: 'var(--text-muted)', fontSize: '0.65rem' }}>cUSD</div>
+                    <div style={{ color: 'var(--text-muted)', fontSize: '0.65rem' }}>{TOKEN_LABELS[link.token] ?? link.token}</div>
                   </div>
                 </div>
               </Link>

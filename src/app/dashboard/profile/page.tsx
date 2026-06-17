@@ -16,11 +16,15 @@ export default function ProfilePage() {
   useEffect(() => {
     detectWallet().then(async (found) => {
       if (!found) { router.replace('/dashboard'); return; }
-      const { address } = await connectMiniPay();
-      setWalletAddress(address);
-      const creator = await getCreatorByWallet(address);
-      if (!creator) { router.replace('/dashboard'); return; }
-      setBio(creator.bio ?? '');
+      try {
+        const { address } = await connectMiniPay();
+        setWalletAddress(address);
+        const creator = await getCreatorByWallet(address);
+        if (!creator) { router.replace('/dashboard'); return; }
+        setBio(creator.bio ?? '');
+      } catch {
+        router.replace('/dashboard');
+      }
     });
   }, [router]);
 

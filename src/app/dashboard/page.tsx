@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
-import { detectWallet, connectMiniPay, disconnectMiniPay } from '@/lib/minipay';
+import { detectWallet, connectMiniPay, disconnectMiniPay, isMiniPay, TOKENS, type TokenSymbol } from '@/lib/minipay';
 import { getOrCreateCreator, getCreatorLinks, getCreatorEarnings } from '@/app/actions/creator';
 import type { Creator, PicoLink } from '@/db/schema';
 
@@ -31,10 +31,9 @@ export default function DashboardPage() {
   }, []);
 
   useEffect(() => {
-    detectWallet().then(async (found) => {
-      if (!found) { setStep('no-minipay'); return; }
-      try {
-        const { address } = await connectMiniPay();
+    if (isMiniPay()) {
+      // Auto-connect inside MiniPay
+      connectMiniPay().then(async ({ address }) => {
         setWalletAddress(address);
         const res = await getOrCreateCreator(address);
         if (res.success && res.creator) {
@@ -44,8 +43,11 @@ export default function DashboardPage() {
         } else {
           setStep('needs-handle');
         }
-      } catch { setStep('no-minipay'); }
-    });
+      }).catch(() => setStep('no-minipay'));
+    } else {
+      // Outside MiniPay, let user choose on-demand
+      setStep('no-minipay');
+    }
   }, [loadDashboard]);
 
   const handleClaim = async () => {
@@ -87,19 +89,52 @@ export default function DashboardPage() {
 
   // ── No MiniPay ──
   if (step === 'no-minipay') {
+    const hasInjected = typeof window !== 'undefined' && !!window.ethereum;
+
+    const handleConnectWallet = async () => {
+      try {
+        const { address } = await connectMiniPay();
+        setWalletAddress(address);
+        const res = await getOrCreateCreator(address);
+        if (res.success && res.creator) {
+          setCreator(res.creator);
+          await loadDashboard(res.creator);
+          setStep('ready');
+        } else {
+          setStep('needs-handle');
+        }
+      } catch (e) {
+        setError(e instanceof Error ? e.message : 'Connection failed. Please try again.');
+      }
+    };
+
     return (
-      <div className="animate-fade" style={{ textAlign: 'center', paddingTop: '4rem' }}>
+      <div className="animate-fade" style={{ textAlign: 'center', paddingTop: '3rem' }}>
         <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>📱</div>
         <h2 style={{ fontSize: '1.3rem', fontWeight: 800, marginBottom: '0.75rem' }}>Open in MiniPay</h2>
         <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', lineHeight: 1.7, marginBottom: '2rem', maxWidth: '260px', margin: '0 auto 2rem' }}>
           Pico is a MiniPay mini app. Open this page inside the MiniPay app on your phone to create your support page.
         </p>
-        <div className="glass" style={{ padding: '1.25rem', background: 'rgba(53,208,127,0.05)', border: '1px solid rgba(53,208,127,0.2)', borderRadius: '14px', marginBottom: '1rem' }}>
-          <p style={{ fontWeight: 700, marginBottom: '0.3rem', fontSize: '0.9rem' }}>Open this page in MiniPay</p>
-          <p style={{ color: 'var(--text-muted)', fontSize: '0.82rem', lineHeight: 1.5 }}>
-            Download MiniPay from the Opera Mini app, then open this URL inside it to create your page.
+
+        <div className="glass" style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '0.75rem', marginBottom: '1.5rem', textAlign: 'left' }}>
+          <p style={{ fontWeight: 700, fontSize: '0.9rem' }}>Web Browser Wallet Connection</p>
+          <p style={{ color: 'var(--text-muted)', fontSize: '0.8rem', lineHeight: 1.5 }}>
+            To access the dashboard, connect your browser wallet extension (such as MetaMask) on the Celo network.
           </p>
+
+          {hasInjected ? (
+            <button className="btn btn-primary" onClick={handleConnectWallet} style={{ width: '100%' }}>
+              🔌 Connect Wallet
+            </button>
+          ) : (
+            <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid var(--card-border)', borderRadius: '12px', padding: '0.85rem', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+              No web3 wallet detected. Please install MetaMask or open this URL inside the MiniPay wallet.
+            </div>
+          )}
         </div>
+
+        {error && <p style={{ color: '#ef4444', fontSize: '0.82rem', marginBottom: '1.5rem' }}>{error}</p>}
+
         <Link href="/" style={{ display: 'block', marginTop: '1rem', color: 'var(--text-muted)', fontSize: '0.85rem', textDecoration: 'none' }}>
           ← Back home
         </Link>
@@ -182,7 +217,7 @@ export default function DashboardPage() {
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginBottom: '1.25rem' }}>
         <div className="glass" style={{ padding: '1.25rem' }}>
           <p style={{ color: 'var(--text-muted)', fontSize: '0.72rem', marginBottom: '0.4rem' }}>TOTAL EARNED</p>
-          <p style={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--accent-celo)' }}>{earnings.total} <span style={{ fontSize: '0.75rem', fontWeight: 400, color: 'var(--text-muted)' }}>cUSD</span></p>
+          <p style={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--accent-celo)' }}>{earnings.total} <span style={{ fontSize: '0.75rem', fontWeight: 400, color: 'var(--text-muted)' }}>USDm</span></p>
         </div>
         <div className="glass" style={{ padding: '1.25rem' }}>
           <p style={{ color: 'var(--text-muted)', fontSize: '0.72rem', marginBottom: '0.4rem' }}>SUPPORTERS</p>
@@ -220,7 +255,7 @@ export default function DashboardPage() {
                     <div>
                       <p style={{ fontWeight: 600, fontSize: '0.9rem' }}>{link.title}</p>
                       <p style={{ color: 'var(--text-muted)', fontSize: '0.72rem' }}>
-                        ${link.price} cUSD · {link.salesCount} supporter{link.salesCount !== 1 ? 's' : ''} · {link.totalEarnings} earned
+                        ${link.price} {TOKENS[link.token as TokenSymbol]?.label ?? link.token} · {link.salesCount} supporter{link.salesCount !== 1 ? 's' : ''} · {link.totalEarnings} earned
                       </p>
                     </div>
                   </div>
@@ -246,7 +281,7 @@ export default function DashboardPage() {
       </div>
 
       <footer style={{ marginTop: '2.5rem', paddingBottom: '3rem', textAlign: 'center' }}>
-        <p style={{ color: 'var(--text-muted)', fontSize: '0.7rem' }}>Celo Network · cUSD · x402 Protocol</p>
+        <p style={{ color: 'var(--text-muted)', fontSize: '0.7rem' }}>Celo Network · USDm · x402 Protocol</p>
       </footer>
     </div>
   );

@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, use } from 'react';
 import Link from 'next/link';
-import { detectWallet, connectMiniPay, sendToken, TOKENS, ALL_TOKENS, DEFAULT_TOKEN, type TokenSymbol } from '@/lib/minipay';
+import { detectWallet, connectMiniPay, sendToken, TOKENS, ALL_TOKENS, DEFAULT_TOKEN, type TokenSymbol, isMiniPay } from '@/lib/minipay';
 import { getLinkWithCreator, hasPurchased, recordPurchase } from '@/app/actions/creator';
 import type { PicoLink } from '@/db/schema';
 
@@ -29,9 +29,6 @@ export default function SupportPage(props: { params: Promise<{ id: string }> }) 
 
   useEffect(() => {
     async function init() {
-      const found = await detectWallet();
-      if (!found) { setState('no-minipay'); return; }
-
       const result = await getLinkWithCreator(id);
       if (!result) { setState('idle'); return; }
       setLink(result.link);
@@ -40,16 +37,25 @@ export default function SupportPage(props: { params: Promise<{ id: string }> }) 
       const preferred = (result.link.token ?? DEFAULT_TOKEN) as TokenSymbol;
       setSelectedToken(preferred);
 
-      try {
-        const { address } = await connectMiniPay();
-        const owned = await hasPurchased(id, address);
-        if (owned) {
-          setContentUrl(result.link.contentUrl ?? '');
-          setThankYou(result.link.thankYouMessage ?? '');
-          setState('already-owned');
+      if (isMiniPay()) {
+        try {
+          const { address } = await connectMiniPay();
+          const owned = await hasPurchased(id, address);
+          if (owned) {
+            setContentUrl(result.link.contentUrl ?? '');
+            setThankYou(result.link.thankYouMessage ?? '');
+            setState('already-owned');
+            return;
+          }
+        } catch { /* proceed */ }
+      } else {
+        // Outside MiniPay, check if wallet is injected
+        const found = await detectWallet(1000);
+        if (!found) {
+          setState('no-minipay');
           return;
         }
-      } catch { /* wallet connect failed — still show idle */ }
+      }
 
       setState('idle');
     }
@@ -122,13 +128,56 @@ export default function SupportPage(props: { params: Promise<{ id: string }> }) 
 
   // ── No wallet found ──
   if (state === 'no-minipay') {
+    const hasInjected = typeof window !== 'undefined' && !!window.ethereum;
+
+    const handleConnectWallet = async () => {
+      try {
+        setState('loading');
+        const { address } = await connectMiniPay();
+        const owned = await hasPurchased(id, address);
+        if (owned && link) {
+          setContentUrl(link.contentUrl ?? '');
+          setThankYou(link.thankYouMessage ?? '');
+          setState('already-owned');
+        } else {
+          setState('idle');
+        }
+      } catch (e) {
+        setErrorMsg(e instanceof Error ? e.message : 'Connection failed');
+        setState('no-minipay');
+      }
+    };
+
     return (
-      <div className="animate-fade" style={{ textAlign: 'center', paddingTop: '5rem' }}>
+      <div className="animate-fade" style={{ textAlign: 'center', paddingTop: '4rem' }}>
         <div style={{ fontSize: '2.5rem', marginBottom: '1rem' }}>📱</div>
         <h2 style={{ fontSize: '1.2rem', marginBottom: '0.75rem' }}>No wallet detected</h2>
-        <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', lineHeight: 1.6, maxWidth: '260px', margin: '0 auto' }}>
+        <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', lineHeight: 1.6, maxWidth: '280px', margin: '0 auto 2rem' }}>
           This page accepts stablecoin payments via Celo. Open this link inside MiniPay, or in a browser with a wallet extension (e.g. MetaMask) connected to Celo, to support this creator.
         </p>
+
+        <div className="glass" style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '0.75rem', maxWidth: '320px', margin: '0 auto 1.5rem', textAlign: 'left' }}>
+          <p style={{ fontWeight: 700, fontSize: '0.9rem' }}>Web Browser Wallet Connection</p>
+          <p style={{ color: 'var(--text-muted)', fontSize: '0.8rem', lineHeight: 1.5 }}>
+            To support this creator, connect your browser wallet extension (such as MetaMask) on the Celo network.
+          </p>
+          
+          {hasInjected ? (
+            <button className="btn btn-primary" onClick={handleConnectWallet} style={{ width: '100%' }}>
+              🔌 Connect Wallet
+            </button>
+          ) : (
+            <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid var(--card-border)', borderRadius: '12px', padding: '0.85rem', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+              No web3 wallet detected. Please install MetaMask or open this URL inside the MiniPay wallet.
+            </div>
+          )}
+        </div>
+
+        {errorMsg && <p style={{ color: '#ef4444', fontSize: '0.82rem', marginTop: '1rem' }}>{errorMsg}</p>}
+        
+        <Link href="/" style={{ color: 'var(--text-muted)', textDecoration: 'none', fontSize: '0.85rem', display: 'block', marginTop: '1rem' }}>
+          ← Back home
+        </Link>
       </div>
     );
   }
@@ -213,7 +262,7 @@ export default function SupportPage(props: { params: Promise<{ id: string }> }) 
           <span style={{ fontSize: '1.6rem', fontWeight: 800, color: 'var(--accent-celo)' }}>
             {tokenMeta.symbol}{link.price}
           </span>
-          <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>{selectedToken}</span>
+          <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>{TOKENS[selectedToken].label}</span>
         </div>
 
         {/* Token selector */}
@@ -231,7 +280,7 @@ export default function SupportPage(props: { params: Promise<{ id: string }> }) 
                     border: `1px solid ${selectedToken === t ? 'var(--accent-celo)' : 'var(--card-border)'}`,
                     color: selectedToken === t ? '#0a1a12' : 'white',
                   }}>
-                  {t}
+                  {TOKENS[t].label}
                 </button>
               ))}
             </div>

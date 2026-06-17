@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { detectWallet, connectMiniPay, ALL_TOKENS, DEFAULT_TOKEN, type TokenSymbol } from '@/lib/minipay';
+import { detectWallet, connectMiniPay, ALL_TOKENS, DEFAULT_TOKEN, type TokenSymbol, isMiniPay, TOKENS } from '@/lib/minipay';
 import { createCreatorWithLink, getCreatorByWallet, getCreatorLinks } from '@/app/actions/creator';
 import type { Creator, PicoLink } from '@/db/schema';
 
@@ -36,10 +36,9 @@ export default function HomePage() {
   const [copied, setCopied]     = useState(false);
 
   useEffect(() => {
-    detectWallet().then(async (found) => {
-      if (!found) { setStage('no-minipay'); return; }
-      try {
-        const { address } = await connectMiniPay();
+    if (isMiniPay()) {
+      // Auto-connect ONLY inside MiniPay
+      connectMiniPay().then(async ({ address }) => {
         setWalletAddr(address);
         const existing = await getCreatorByWallet(address);
         if (existing) {
@@ -50,10 +49,13 @@ export default function HomePage() {
         } else {
           setStage('new-creator');
         }
-      } catch {
-        setStage('new-creator'); // still let them try
-      }
-    });
+      }).catch(() => {
+        setStage('new-creator');
+      });
+    } else {
+      // Outside MiniPay, don't auto-connect (prevent popup on page load).
+      setStage('no-minipay');
+    }
   }, []);
 
   const handleCreate = async () => {
@@ -115,22 +117,42 @@ export default function HomePage() {
 
   // ── Not in MiniPay ── (no external links — they break MiniPay navigation)
   if (stage === 'no-minipay') {
+    const hasInjected = typeof window !== 'undefined' && !!window.ethereum;
+
+    const handleConnectWallet = async () => {
+      try {
+        const { address } = await connectMiniPay();
+        setWalletAddr(address);
+        const existing = await getCreatorByWallet(address);
+        if (existing) {
+          setCreator(existing);
+          const ls = await getCreatorLinks(existing.id);
+          setLinks(ls);
+          setStage('returning');
+        } else {
+          setStage('new-creator');
+        }
+      } catch (e) {
+        setError(e instanceof Error ? e.message : 'Connection failed. Please try again.');
+      }
+    };
+
     return (
-      <div className="animate-fade" style={{ textAlign: 'center', paddingTop: '4rem' }}>
+      <div className="animate-fade" style={{ textAlign: 'center', paddingTop: '3rem' }}>
         <div style={{ fontSize: '3rem', marginBottom: '1.25rem' }}>🍵</div>
         <h1 style={{ fontSize: '1.6rem', fontWeight: 800, marginBottom: '0.5rem' }}>Pico</h1>
         <p style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '0.5rem' }}>
           Get paid by your fans
         </p>
-        <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', lineHeight: 1.7, maxWidth: '280px', margin: '0 auto 2.5rem' }}>
-          Like "Buy Me a Tea" — but payments go straight to your MiniPay wallet in cUSD. No bank. No Stripe.
+        <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', lineHeight: 1.7, maxWidth: '280px', margin: '0 auto 2rem' }}>
+          Like "Buy Me a Tea" — but payments go straight to your MiniPay wallet in USDm. No bank. No Stripe.
         </p>
 
         <div className="glass" style={{ padding: '1.5rem', marginBottom: '1.5rem', textAlign: 'left' }}>
           {[
             { n: '1', t: 'Open Pico inside the MiniPay app' },
             { n: '2', t: 'Set your name, purpose and price' },
-            { n: '3', t: 'Share your link. Fans pay in cUSD.' },
+            { n: '3', t: 'Share your link. Fans pay in USDm.' },
           ].map(s => (
             <div key={s.n} style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1rem' }}>
               <div style={{
@@ -144,14 +166,24 @@ export default function HomePage() {
           ))}
         </div>
 
-        {/* NO external links here — they cause MiniPay to navigate home */}
-        <div className="glass" style={{ padding: '1.25rem', background: 'rgba(53,208,127,0.05)', border: '1px solid rgba(53,208,127,0.2)' }}>
-          <p style={{ fontWeight: 700, marginBottom: '0.3rem' }}>No wallet detected</p>
-          <p style={{ color: 'var(--text-muted)', fontSize: '0.82rem', lineHeight: 1.5 }}>
-            Open this page inside MiniPay, or in a browser with a wallet extension
-            (e.g. MetaMask) connected to the Celo network to try it out.
+        <div className="glass" style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '0.75rem', marginBottom: '1.5rem' }}>
+          <p style={{ fontWeight: 700, fontSize: '0.9rem' }}>Web Browser Wallet Connection</p>
+          <p style={{ color: 'var(--text-muted)', fontSize: '0.8rem', lineHeight: 1.5 }}>
+            To create and manage support links, connect your browser wallet extension (such as MetaMask) on the Celo network.
           </p>
+          
+          {hasInjected ? (
+            <button className="btn btn-primary" onClick={handleConnectWallet} style={{ width: '100%' }}>
+              🔌 Connect Wallet
+            </button>
+          ) : (
+            <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid var(--card-border)', borderRadius: '12px', padding: '0.85rem', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+              No web3 wallet detected. Please install MetaMask or open this URL inside the MiniPay wallet.
+            </div>
+          )}
         </div>
+
+        {error && <p style={{ color: '#ef4444', fontSize: '0.82rem', marginBottom: '1.5rem' }}>{error}</p>}
       </div>
     );
   }
@@ -166,7 +198,7 @@ export default function HomePage() {
           Your link is ready!
         </h2>
         <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', lineHeight: 1.6, marginBottom: '2rem' }}>
-          Share it anywhere — fans tap it, pay you in cUSD, and you receive it instantly.
+          Share it anywhere — fans tap it, pay you in USDm, and you receive it instantly.
         </p>
 
         <div className="glass" style={{ padding: '1.5rem', marginBottom: '1rem' }}>
@@ -341,7 +373,7 @@ export default function HomePage() {
         <div style={{ fontSize: '2.5rem', marginBottom: '0.5rem' }}>🍵</div>
         <h1 style={{ fontSize: '1.5rem', fontWeight: 800, marginBottom: '0.4rem' }}>Create Your Page</h1>
         <p style={{ color: 'var(--text-muted)', fontSize: '0.88rem', lineHeight: 1.5 }}>
-          Set up once. Share your link. Get paid in USDC, cUSD, cEUR or cREAL.
+          Set up once. Share your link. Get paid in USDC, USDm, EURm or BRLm.
         </p>
       </header>
 
@@ -425,7 +457,7 @@ export default function HomePage() {
                   border: `1px solid ${token === t ? 'var(--accent-celo)' : 'var(--card-border)'}`,
                   color: token === t ? '#0a1a12' : 'white',
                 }}>
-                {t}
+                {TOKENS[t].label}
               </button>
             ))}
           </div>
