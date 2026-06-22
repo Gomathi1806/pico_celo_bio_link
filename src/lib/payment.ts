@@ -1,6 +1,6 @@
 import { createPublicClient, http, parseUnits, type Hash } from "viem";
 import { celo, celoAlfajores } from "viem/chains";
-import type { CeloNetwork } from "./minipay";
+import type { CeloNetwork } from "./tokens";
 
 const TRANSFER_TOPIC =
   "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef" as `0x${string}`;

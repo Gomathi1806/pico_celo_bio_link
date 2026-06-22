@@ -49,26 +49,22 @@ export async function POST(
 
   console.log(`[verify/${id}] tx ${txHash} | token ${token} | creator ${creatorWallet} | expected ${creatorAmount}`);
 
-  let result = await verifyPayment({
+  const verifyArgs = {
     txHash,
     recipientAddress: creatorWallet,
     requiredUsd: creatorAmount,
     network: NETWORK,
     tokenAddress,
     tokenDecimals: tokenMeta.decimals,
-  });
+  };
 
-  // Retry once after 5s if block not yet mined (~5s on Celo)
-  if (!result.valid && result.reason.includes("not found")) {
+  let result = await verifyPayment(verifyArgs);
+
+  // Poll up to 4 more times (5s apart = 20s total) waiting for block to land
+  for (let attempt = 0; attempt < 4 && !result.valid && result.reason.includes("not found"); attempt++) {
+    console.log(`[verify/${id}] tx not found yet — retry ${attempt + 1}/4 in 5s`);
     await new Promise((r) => setTimeout(r, 5000));
-    result = await verifyPayment({
-      txHash,
-      recipientAddress: creatorWallet,
-      requiredUsd: creatorAmount,
-      network: NETWORK,
-      tokenAddress,
-      tokenDecimals: tokenMeta.decimals,
-    });
+    result = await verifyPayment(verifyArgs);
   }
 
   if (!result.valid) {
