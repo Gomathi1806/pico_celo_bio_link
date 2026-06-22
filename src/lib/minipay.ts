@@ -122,6 +122,9 @@ export async function connectMiniPay(): Promise<ConnectedWallet> {
   if (!address) throw new Error("No wallet address returned.");
   _address = address;
 
+  // MiniPay manages its own network (always Celo mainnet) — skip network switching
+  if (isMiniPay()) return { address };
+
   const { chainIdHex } = CHAIN_MAP[NETWORK];
   try {
     const current = (await provider.request({ method: "eth_chainId" }));

@@ -49,7 +49,12 @@ export default function HomePage() {
         } else {
           setStage('new-creator');
         }
-      }).catch(() => {
+      }).catch(async () => {
+        // Fallback: try getting address directly without network switching
+        try {
+          const accounts = await (window.ethereum as any).request({ method: 'eth_requestAccounts' }) as string[];
+          if (accounts[0]) setWalletAddr(accounts[0]);
+        } catch { /* ignore */ }
         setStage('new-creator');
       });
     } else {
