@@ -5,15 +5,26 @@ import type { CeloNetwork } from "./tokens";
 const TRANSFER_TOPIC =
   "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef" as `0x${string}`;
 
-const RPC: Record<CeloNetwork, string> = {
-  celo:             process.env.CELO_RPC_URL ?? "https://forno.celo.org",
-  "celo-alfajores": process.env.CELO_ALFAJORES_RPC_URL ?? "https://alfajores-forno.celo-testnet.org",
+// Multiple fallback RPCs — forno rate-limits aggressively on serverless
+const RPC_URLS: Record<CeloNetwork, string[]> = {
+  celo: [
+    process.env.CELO_RPC_URL ?? "",
+    "https://celo.drpc.org",
+    "https://rpc.ankr.com/celo",
+    "https://forno.celo.org",
+  ].filter(Boolean),
+  "celo-alfajores": [
+    process.env.CELO_ALFAJORES_RPC_URL ?? "",
+    "https://alfajores-forno.celo-testnet.org",
+  ].filter(Boolean),
 };
 
-function getClient(network: CeloNetwork) {
+function getClient(network: CeloNetwork, rpcIndex = 0) {
+  const urls = RPC_URLS[network];
+  const url = urls[rpcIndex % urls.length];
   return createPublicClient({
     chain: network === "celo" ? celo : celoAlfajores,
-    transport: http(RPC[network]),
+    transport: http(url),
   });
 }
 
@@ -40,12 +51,18 @@ export async function verifyPayment({
   // Use 6 decimal places for USD amounts — more than sufficient precision for all supported tokens
   const required = parseUnits(requiredUsd.toFixed(6), tokenDecimals);
 
-  let receipt: Awaited<ReturnType<typeof client.getTransactionReceipt>>;
-  try {
-    receipt = await client.getTransactionReceipt({ hash: txHash });
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    console.error(`[verifyPayment] getTransactionReceipt failed for ${txHash}:`, msg);
+  let receipt: Awaited<ReturnType<typeof client.getTransactionReceipt>> | null = null;
+  const urls = RPC_URLS[network];
+  for (let i = 0; i < urls.length; i++) {
+    try {
+      receipt = await getClient(network, i).getTransactionReceipt({ hash: txHash });
+      break;
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error(`[verifyPayment] RPC ${urls[i]} failed for ${txHash}: ${msg}`);
+    }
+  }
+  if (!receipt) {
     return { valid: false, reason: "Transaction not found on Celo." };
   }
 
