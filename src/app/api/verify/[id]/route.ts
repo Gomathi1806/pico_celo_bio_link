@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getLinkWithCreator } from "@/app/actions/creator";
 import { verifyPayment } from "@/lib/payment";
-import { TOKENS, DEFAULT_TOKEN, type CeloNetwork, type TokenSymbol } from "@/lib/minipay";
+import { TOKENS, DEFAULT_TOKEN, type CeloNetwork, type TokenSymbol } from "@/lib/tokens";
 
 const NETWORK = (process.env.NEXT_PUBLIC_CELO_NETWORK ?? "celo-alfajores") as CeloNetwork;
 const PLATFORM_FEE = 0.01; // 1%

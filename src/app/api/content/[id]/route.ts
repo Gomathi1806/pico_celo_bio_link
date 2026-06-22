@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getLinkById } from '@/app/actions/creator';
 import { verifyPayment } from '@/lib/payment';
-import type { CeloNetwork } from '@/lib/minipay';
+import type { CeloNetwork } from '@/lib/tokens';
 
 const OPERATOR = (process.env.NEXT_PUBLIC_OPERATOR_ADDRESS ?? '') as `0x${string}`;
 const NETWORK = (process.env.NEXT_PUBLIC_CELO_NETWORK ?? 'celo-alfajores') as CeloNetwork;
