@@ -70,8 +70,25 @@ export async function connectMiniPay(): Promise<ConnectedWallet> {
   if (!address) throw new Error("No wallet address returned.");
   _address = address;
 
-  // MiniPay manages its own network (always Celo mainnet) — skip network switching
-  if (isMiniPay()) return { address };
+  // Inside MiniPay, try to switch network but don't throw if it fails
+  if (isMiniPay()) {
+    try {
+      const current = await provider.request({ method: "eth_chainId" });
+      const currentId = typeof current === "string"
+        ? parseInt(current.startsWith("0x") ? current : `0x${current}`, 16)
+        : Number(current);
+      if (currentId !== CHAIN_MAP[NETWORK].chainId) {
+        await provider.request({
+          method: "wallet_switchEthereumChain",
+          params: [{ chainId: CHAIN_MAP[NETWORK].chainIdHex }],
+        });
+      }
+    } catch {
+      // MiniPay may reject network switching — proceed and let the user's
+      // current network be used; mismatch will surface at verify time
+    }
+    return { address };
+  }
 
   const { chainIdHex } = CHAIN_MAP[NETWORK];
   try {
