@@ -18,6 +18,7 @@ export async function POST(
     const body = await req.json();
     txHash = body.txHash;
     token = (body.token as TokenSymbol) ?? DEFAULT_TOKEN;
+    console.log(`[verify/${id}] received txHash=${txHash} token=${token} network=${NETWORK}`);
     if (!txHash) throw new Error("missing txHash");
   } catch {
     return NextResponse.json({ error: "txHash required" }, { status: 400 });

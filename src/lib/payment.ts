@@ -5,10 +5,15 @@ import type { CeloNetwork } from "./tokens";
 const TRANSFER_TOPIC =
   "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef" as `0x${string}`;
 
+const RPC: Record<CeloNetwork, string> = {
+  celo:             process.env.CELO_RPC_URL ?? "https://forno.celo.org",
+  "celo-alfajores": process.env.CELO_ALFAJORES_RPC_URL ?? "https://alfajores-forno.celo-testnet.org",
+};
+
 function getClient(network: CeloNetwork) {
   return createPublicClient({
     chain: network === "celo" ? celo : celoAlfajores,
-    transport: http(),
+    transport: http(RPC[network]),
   });
 }
 
@@ -38,7 +43,9 @@ export async function verifyPayment({
   let receipt: Awaited<ReturnType<typeof client.getTransactionReceipt>>;
   try {
     receipt = await client.getTransactionReceipt({ hash: txHash });
-  } catch {
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error(`[verifyPayment] getTransactionReceipt failed for ${txHash}:`, msg);
     return { valid: false, reason: "Transaction not found on Celo." };
   }
 
