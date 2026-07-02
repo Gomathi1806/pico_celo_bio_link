@@ -24,6 +24,7 @@ export default function HomePage() {
   const [creator, setCreator]   = useState<Creator | null>(null);
   const [links, setLinks]       = useState<PicoLink[]>([]);
   const [newLinkId, setNewLinkId] = useState('');
+  const [creatorHandle, setCreatorHandle] = useState('');
   const [walletAddr, setWalletAddr] = useState('');
 
   // Form state
@@ -91,6 +92,7 @@ export default function HomePage() {
       });
       if (res.success && res.linkId) {
         setNewLinkId(res.linkId);
+        if (res.handle) setCreatorHandle(res.handle);
         setStage('done');
       } else {
         setError(res.error ?? 'Something went wrong. Try again.');
@@ -195,7 +197,7 @@ export default function HomePage() {
 
   // ── Done — just created ──
   if (stage === 'done' && newLinkId) {
-    const shareUrl = `${origin}/c/${newLinkId}`;
+    const shareUrl = creatorHandle ? `${origin}/@${creatorHandle}` : `${origin}/c/${newLinkId}`;
     return (
       <div className="animate-fade" style={{ textAlign: 'center', paddingTop: '3rem' }}>
         <div style={{ fontSize: '3.5rem', marginBottom: '0.75rem' }}>🎉</div>
@@ -308,7 +310,7 @@ export default function HomePage() {
                   price: finalPrice,
                   token,
                 });
-                if (res.success && res.linkId) { setNewLinkId(res.linkId); setStage('done'); }
+                if (res.success && res.linkId) { setNewLinkId(res.linkId); if (res.handle) setCreatorHandle(res.handle); setStage('done'); }
                 else { setError(res.error ?? 'Failed. Try again.'); setStage('returning'); }
               } catch (e) {
                 setError(e instanceof Error ? e.message : 'Failed. Try again.');
