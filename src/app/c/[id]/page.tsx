@@ -3,6 +3,7 @@
 import React, { useState, useEffect, use } from 'react';
 import Link from 'next/link';
 import { detectWallet, connectMiniPay, sendToken, TOKENS, ALL_TOKENS, DEFAULT_TOKEN, type TokenSymbol, isMiniPay } from '@/lib/minipay';
+import { MINIPAY_TOKENS } from '@/lib/tokens';
 import { getLinkWithCreator, hasPurchased, recordPurchase } from '@/app/actions/creator';
 import type { PicoLink } from '@/db/schema';
 
@@ -109,6 +110,11 @@ export default function SupportPage(props: { params: Promise<{ id: string }> }) 
 
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Payment failed. Please try again.';
+      const isLowBalance = msg.toLowerCase().includes('insufficient') || msg.toLowerCase().includes('balance');
+      if (isLowBalance) {
+        window.location.href = 'https://link.minipay.xyz/add_cash?tokens=USDC,USDm';
+        return;
+      }
       if (!msg.toLowerCase().includes('cancel') && !msg.toLowerCase().includes('denied')) {
         setErrorMsg(msg);
       }
@@ -272,7 +278,7 @@ export default function SupportPage(props: { params: Promise<{ id: string }> }) 
               PAY WITH
             </p>
             <div style={{ display: 'flex', gap: '0.4rem', justifyContent: 'center', flexWrap: 'wrap' }}>
-              {ALL_TOKENS.map(t => (
+              {(isMiniPay() ? MINIPAY_TOKENS : ALL_TOKENS).map(t => (
                 <button key={t} onClick={() => setSelectedToken(t)}
                   style={{
                     padding: '0.4rem 0.9rem', borderRadius: '100px', fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer',
@@ -331,7 +337,7 @@ export default function SupportPage(props: { params: Promise<{ id: string }> }) 
         {!isPaying && (
           <div style={{ marginTop: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
             <p style={{ color: 'var(--text-muted)', fontSize: '0.68rem' }}>
-              ⚡ Instant · 🔐 On-chain Celo · ~$0.001 gas
+              ⚡ Instant · 🔐 On-chain Celo · ~$0.001 Network fee
             </p>
             {link.salesCount > 0 && (
               <p style={{ color: 'var(--accent-celo)', fontSize: '0.68rem', fontWeight: 700 }}>
@@ -347,10 +353,15 @@ export default function SupportPage(props: { params: Promise<{ id: string }> }) 
 
       <footer style={{ marginTop: '3rem', textAlign: 'center', paddingBottom: '3rem' }}>
         <Link href="/" style={{ textDecoration: 'none' }}>
-          <p style={{ color: 'var(--text-muted)', fontSize: '0.7rem' }}>
+          <p style={{ color: 'var(--text-muted)', fontSize: '0.7rem', marginBottom: '0.5rem' }}>
             🍵 Powered by <strong style={{ color: 'white' }}>Pico</strong> · Get your free page
           </p>
         </Link>
+        <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center', flexWrap: 'wrap' }}>
+          <a href="/terms" style={{ color: 'var(--text-muted)', fontSize: '0.65rem', textDecoration: 'none' }}>Terms</a>
+          <a href="/privacy" style={{ color: 'var(--text-muted)', fontSize: '0.65rem', textDecoration: 'none' }}>Privacy</a>
+          <a href="mailto:tgomathi1806@gmail.com" style={{ color: 'var(--text-muted)', fontSize: '0.65rem', textDecoration: 'none' }}>Support</a>
+        </div>
       </footer>
     </div>
   );
