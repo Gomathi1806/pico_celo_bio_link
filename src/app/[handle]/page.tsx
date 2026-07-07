@@ -72,12 +72,8 @@ export default async function CreatorBioPage(props: { params: Promise<{ handle: 
                 <div className="glass" style={{
                   padding: '1.1rem 1.25rem',
                   display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                  transition: 'border-color 0.15s, background 0.15s',
                   cursor: 'pointer',
-                }}
-                  onMouseEnter={e => (e.currentTarget.style.borderColor = 'rgba(53,208,127,0.4)')}
-                  onMouseLeave={e => (e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)')}
-                >
+                }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.9rem', flex: 1, minWidth: 0 }}>
                     <span style={{ fontSize: '1.4rem', flexShrink: 0 }}>{emoji}</span>
                     <div style={{ minWidth: 0 }}>
