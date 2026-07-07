@@ -38,7 +38,8 @@ export async function getCreatorByWallet(walletAddress: string) {
 
 export async function getCreatorByHandle(handle: string) {
   const db = getDb();
-  return db.query.creators.findFirst({ where: eq(creators.handle, handle.toLowerCase()) });
+  const clean = handle.replace(/^@/, '').toLowerCase();
+  return db.query.creators.findFirst({ where: eq(creators.handle, clean) });
 }
 
 export async function updateCreatorBio(walletAddress: string, bio: string) {
