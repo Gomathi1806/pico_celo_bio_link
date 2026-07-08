@@ -137,8 +137,41 @@ export default function HomePage() {
     const TOKEN_LABELS: Record<string, string> = { USDC: 'USDC', cUSD: 'USDm', cEUR: 'EURm', cREAL: 'BRLm' };
     const TYPE_EMOJI_FAN: Record<string, string> = { tip: '🍵', coffee: '🍵', pdf: '📄', guide: '📘', call: '🎯', audio: '🎙️', video: '🎬', other: '🎁' };
     const initial = fanCreator.handle[0].toUpperCase();
+    const inMiniPay = isMiniPay();
+    const currentUrl = typeof window !== 'undefined' ? window.location.href : '';
     return (
       <div className="animate-fade">
+
+        {/* Banner for users outside MiniPay */}
+        {!inMiniPay && (
+          <div style={{
+            background: 'rgba(53,208,127,0.1)', border: '1px solid rgba(53,208,127,0.3)',
+            borderRadius: '16px', padding: '1.25rem', marginBottom: '1.5rem', textAlign: 'center',
+          }}>
+            <p style={{ fontWeight: 700, fontSize: '0.95rem', marginBottom: '0.4rem' }}>
+              Pay with MiniPay
+            </p>
+            <p style={{ color: 'var(--text-muted)', fontSize: '0.82rem', lineHeight: 1.5, marginBottom: '1rem' }}>
+              To support @{fanCreator.handle}, open this page inside the MiniPay wallet app. It's free and takes 30 seconds to set up.
+            </p>
+            <a
+              href="https://play.google.com/store/apps/details?id=com.opera.minipay"
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{
+                display: 'inline-block', background: 'var(--accent-celo)', color: '#0a1a12',
+                fontWeight: 800, fontSize: '0.88rem', padding: '0.7rem 1.5rem',
+                borderRadius: '100px', textDecoration: 'none', marginBottom: '0.5rem',
+              }}
+            >
+              Get MiniPay (Free)
+            </a>
+            <p style={{ color: 'var(--text-muted)', fontSize: '0.72rem', marginTop: '0.4rem' }}>
+              Then open this link inside MiniPay to pay
+            </p>
+          </div>
+        )}
+
         <header style={{ textAlign: 'center', padding: '2.5rem 0 2rem' }}>
           <div style={{ width: 80, height: 80, borderRadius: '50%', background: 'linear-gradient(135deg, #35d07f, #3b82f6)', margin: '0 auto 1rem', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '2rem', fontWeight: 800, color: '#0a1a12' }}>
             {initial}
@@ -159,7 +192,9 @@ export default function HomePage() {
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
             {fanLinks.map((link: PicoLink) => (
-              <Link key={link.id} href={`/c/${link.id}`} style={{ textDecoration: 'none', color: 'white' }}>
+              <Link key={link.id} href={inMiniPay ? `/c/${link.id}` : '#'} style={{ textDecoration: 'none', color: 'white' }}
+                onClick={!inMiniPay ? (e) => { e.preventDefault(); window.scrollTo({ top: 0, behavior: 'smooth' }); } : undefined}
+              >
                 <div className="glass" style={{ padding: '1.1rem 1.25rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.9rem', flex: 1, minWidth: 0 }}>
                     <span style={{ fontSize: '1.4rem', flexShrink: 0 }}>{TYPE_EMOJI_FAN[link.type] ?? '🎁'}</span>
