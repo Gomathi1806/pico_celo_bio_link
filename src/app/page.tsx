@@ -317,10 +317,20 @@ export default function HomePage() {
               <p style={{ fontSize: '0.88rem', lineHeight: 1.4 }}>{s.t}</p>
             </div>
           ))}
-          {hasInjected && (
+          {hasInjected ? (
             <button className="btn btn-secondary" onClick={handleConnectWallet} style={{ width: '100%', marginTop: '0.5rem' }}>
               🔌 Connect Wallet to Create Page
             </button>
+          ) : (
+            <a
+              href="https://play.google.com/store/apps/details?id=com.opera.minipay"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="btn btn-secondary"
+              style={{ textDecoration: 'none', display: 'block', textAlign: 'center', width: '100%', marginTop: '0.5rem', boxSizing: 'border-box' }}
+            >
+              Get MiniPay to Start Creating →
+            </a>
           )}
         </div>
 
