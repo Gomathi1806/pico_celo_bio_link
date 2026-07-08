@@ -155,33 +155,40 @@ export default function SupportPage(props: { params: Promise<{ id: string }> }) 
     };
 
     return (
-      <div className="animate-fade" style={{ textAlign: 'center', paddingTop: '4rem' }}>
-        <div style={{ fontSize: '2.5rem', marginBottom: '1rem' }}>📱</div>
-        <h2 style={{ fontSize: '1.2rem', marginBottom: '0.75rem' }}>No wallet detected</h2>
-        <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', lineHeight: 1.6, maxWidth: '280px', margin: '0 auto 2rem' }}>
-          This page accepts stablecoin payments via Celo. Open this link inside MiniPay, or in a browser with a wallet extension (e.g. MetaMask) connected to Celo, to support this creator.
+      <div className="animate-fade" style={{ textAlign: 'center', paddingTop: '3rem' }}>
+        <div style={{ fontSize: '2.5rem', marginBottom: '1rem' }}>🍵</div>
+        <h2 style={{ fontSize: '1.2rem', fontWeight: 800, marginBottom: '0.5rem' }}>Open in MiniPay to Pay</h2>
+        <p style={{ color: 'var(--text-muted)', fontSize: '0.88rem', lineHeight: 1.6, maxWidth: '260px', margin: '0 auto 2rem' }}>
+          Pico payments run on Celo via MiniPay — a free stablecoin wallet by Opera. Get it in 30 seconds.
         </p>
 
-        <div className="glass" style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '0.75rem', maxWidth: '320px', margin: '0 auto 1.5rem', textAlign: 'left' }}>
-          <p style={{ fontWeight: 700, fontSize: '0.9rem' }}>Web Browser Wallet Connection</p>
-          <p style={{ color: 'var(--text-muted)', fontSize: '0.8rem', lineHeight: 1.5 }}>
-            To support this creator, connect your browser wallet extension (such as MetaMask) on the Celo network.
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', maxWidth: '320px', margin: '0 auto' }}>
+          <a
+            href="https://play.google.com/store/apps/details?id=com.opera.minipay"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="btn btn-primary"
+            style={{ textDecoration: 'none', padding: '1rem', fontSize: '1rem', fontWeight: 800 }}
+          >
+            Get MiniPay (Free) →
+          </a>
+          <p style={{ color: 'var(--text-muted)', fontSize: '0.78rem', lineHeight: 1.5 }}>
+            After installing, open MiniPay, tap the browser icon, and paste this link to complete your payment.
           </p>
-          
-          {hasInjected ? (
-            <button className="btn btn-primary" onClick={handleConnectWallet} style={{ width: '100%' }}>
-              🔌 Connect Wallet
-            </button>
-          ) : (
-            <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid var(--card-border)', borderRadius: '12px', padding: '0.85rem', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-              No web3 wallet detected. Please install MetaMask or open this URL inside the MiniPay wallet.
+
+          {hasInjected && (
+            <div style={{ marginTop: '0.5rem', borderTop: '1px solid var(--card-border)', paddingTop: '1rem' }}>
+              <p style={{ color: 'var(--text-muted)', fontSize: '0.78rem', marginBottom: '0.5rem' }}>Already on Celo desktop?</p>
+              <button className="btn btn-secondary" onClick={handleConnectWallet} style={{ width: '100%' }}>
+                🔌 Connect Wallet
+              </button>
             </div>
           )}
         </div>
 
         {errorMsg && <p style={{ color: '#ef4444', fontSize: '0.82rem', marginTop: '1rem' }}>{errorMsg}</p>}
-        
-        <Link href="/" style={{ color: 'var(--text-muted)', textDecoration: 'none', fontSize: '0.85rem', display: 'block', marginTop: '1rem' }}>
+
+        <Link href="/" style={{ color: 'var(--text-muted)', textDecoration: 'none', fontSize: '0.85rem', display: 'block', marginTop: '2rem' }}>
           ← Back home
         </Link>
       </div>
