@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { detectWallet, connectMiniPay, ALL_TOKENS, DEFAULT_TOKEN, type TokenSymbol, isMiniPay, TOKENS } from '@/lib/minipay';
-import { createCreatorWithLink, getCreatorByWallet, getCreatorLinks } from '@/app/actions/creator';
+import { createCreatorWithLink, getCreatorByWallet, getCreatorLinks, getCreatorByHandle } from '@/app/actions/creator';
 import type { Creator, PicoLink } from '@/db/schema';
 
 type Stage =
@@ -12,7 +12,8 @@ type Stage =
   | 'new-creator'      // in MiniPay, no account yet — show creation form
   | 'creating'         // submitting form
   | 'returning'        // existing creator
-  | 'done';            // just created — show link
+  | 'done'             // just created — show link
+  | 'fan-view';        // viewing a creator via ?p=handle
 
 const PRICE_PRESETS = ['1', '2', '5', '10'];
 const TYPE_EMOJI: Record<string, string> = {
@@ -26,6 +27,8 @@ export default function HomePage() {
   const [newLinkId, setNewLinkId] = useState('');
   const [creatorHandle, setCreatorHandle] = useState('');
   const [walletAddr, setWalletAddr] = useState('');
+  const [fanCreator, setFanCreator] = useState<Creator | null>(null);
+  const [fanLinks, setFanLinks] = useState<PicoLink[]>([]);
 
   // Form state
   const [name, setName]         = useState('');
@@ -37,6 +40,23 @@ export default function HomePage() {
   const [copied, setCopied]     = useState(false);
 
   useEffect(() => {
+    // Check for ?p=handle — fan viewing a creator page
+    const params = new URLSearchParams(window.location.search);
+    const pHandle = params.get('p');
+    if (pHandle) {
+      getCreatorByHandle(pHandle).then(async (c) => {
+        if (c) {
+          const ls = await getCreatorLinks(c.id);
+          setFanCreator(c);
+          setFanLinks(ls);
+          setStage('fan-view');
+        } else {
+          setStage('no-minipay');
+        }
+      });
+      return;
+    }
+
     if (isMiniPay()) {
       // Auto-connect ONLY inside MiniPay
       connectMiniPay().then(async ({ address }) => {
@@ -111,6 +131,70 @@ export default function HomePage() {
   };
 
   const origin = typeof window !== 'undefined' ? window.location.origin : '';
+
+  // ── Fan view — ?p=handle ──
+  if (stage === 'fan-view' && fanCreator) {
+    const TOKEN_LABELS: Record<string, string> = { USDC: 'USDC', cUSD: 'USDm', cEUR: 'EURm', cREAL: 'BRLm' };
+    const TYPE_EMOJI_FAN: Record<string, string> = { tip: '🍵', coffee: '🍵', pdf: '📄', guide: '📘', call: '🎯', audio: '🎙️', video: '🎬', other: '🎁' };
+    const initial = fanCreator.handle[0].toUpperCase();
+    return (
+      <div className="animate-fade">
+        <header style={{ textAlign: 'center', padding: '2.5rem 0 2rem' }}>
+          <div style={{ width: 80, height: 80, borderRadius: '50%', background: 'linear-gradient(135deg, #35d07f, #3b82f6)', margin: '0 auto 1rem', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '2rem', fontWeight: 800, color: '#0a1a12' }}>
+            {initial}
+          </div>
+          <h1 style={{ fontSize: '1.4rem', fontWeight: 800 }}>@{fanCreator.handle}</h1>
+          {fanCreator.bio && (
+            <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginTop: '0.5rem', lineHeight: 1.6, maxWidth: '260px', margin: '0.6rem auto 0' }}>
+              {fanCreator.bio}
+            </p>
+          )}
+        </header>
+
+        {fanLinks.length === 0 ? (
+          <div className="glass" style={{ padding: '2.5rem', textAlign: 'center' }}>
+            <p style={{ fontSize: '1.5rem', marginBottom: '0.75rem' }}>🌱</p>
+            <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>Nothing here yet — check back soon!</p>
+          </div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+            {fanLinks.map((link: PicoLink) => (
+              <Link key={link.id} href={`/c/${link.id}`} style={{ textDecoration: 'none', color: 'white' }}>
+                <div className="glass" style={{ padding: '1.1rem 1.25rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.9rem', flex: 1, minWidth: 0 }}>
+                    <span style={{ fontSize: '1.4rem', flexShrink: 0 }}>{TYPE_EMOJI_FAN[link.type] ?? '🎁'}</span>
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ fontWeight: 700, fontSize: '0.95rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{link.title}</div>
+                      {link.description && (
+                        <div style={{ color: 'var(--text-muted)', fontSize: '0.78rem', marginTop: '0.15rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{link.description}</div>
+                      )}
+                      {link.salesCount > 0 && (
+                        <div style={{ color: 'var(--accent-celo)', fontSize: '0.68rem', fontWeight: 700, marginTop: '0.2rem' }}>{link.salesCount} supporter{link.salesCount !== 1 ? 's' : ''}</div>
+                      )}
+                    </div>
+                  </div>
+                  <div style={{ textAlign: 'right', flexShrink: 0, marginLeft: '1rem' }}>
+                    <div style={{ fontWeight: 800, fontSize: '1.1rem', color: 'var(--accent-celo)' }}>${link.price}</div>
+                    <div style={{ color: 'var(--text-muted)', fontSize: '0.65rem' }}>{TOKEN_LABELS[link.token] ?? link.token}</div>
+                  </div>
+                </div>
+              </Link>
+            ))}
+          </div>
+        )}
+
+        <footer style={{ marginTop: '3rem', textAlign: 'center', paddingBottom: '3rem' }}>
+          <Link href="/" style={{ textDecoration: 'none' }}>
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', color: 'var(--text-muted)', fontSize: '0.78rem' }}>
+              <span style={{ fontSize: '0.9rem' }}>🍵</span>
+              <span>Powered by <strong style={{ color: 'white' }}>Pico</strong></span>
+              <span>· Get your free page</span>
+            </div>
+          </Link>
+        </footer>
+      </div>
+    );
+  }
 
   // ── Detecting ──
   if (stage === 'detecting') {
@@ -197,7 +281,7 @@ export default function HomePage() {
 
   // ── Done — just created ──
   if (stage === 'done' && newLinkId) {
-    const shareUrl = creatorHandle ? `${origin}/@${creatorHandle}` : `${origin}/c/${newLinkId}`;
+    const shareUrl = creatorHandle ? `${origin}/?p=${creatorHandle}` : `${origin}/c/${newLinkId}`;
     return (
       <div className="animate-fade" style={{ textAlign: 'center', paddingTop: '3rem' }}>
         <div style={{ fontSize: '3.5rem', marginBottom: '0.75rem' }}>🎉</div>
@@ -342,7 +426,7 @@ export default function HomePage() {
                     </p>
                   </div>
                   <button
-                    onClick={() => copyLink(`${origin}/c/${link.id}`)}
+                    onClick={() => copyLink(`${origin}/?p=${creator.handle}`)}
                     className="btn btn-secondary"
                     style={{ padding: '0.35rem 0.75rem', fontSize: '0.72rem' }}
                   >
