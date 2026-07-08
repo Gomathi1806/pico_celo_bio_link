@@ -275,6 +275,32 @@ export default function HomePage() {
         </div>
 
         {error && <p style={{ color: '#ef4444', fontSize: '0.82rem', marginBottom: '1.5rem' }}>{error}</p>}
+
+        {/* Find a creator */}
+        <div className="glass" style={{ padding: '1.5rem', marginTop: '1rem' }}>
+          <p style={{ fontWeight: 700, fontSize: '0.9rem', marginBottom: '0.5rem' }}>Find a Creator</p>
+          <p style={{ color: 'var(--text-muted)', fontSize: '0.8rem', marginBottom: '0.75rem' }}>
+            Have a creator's handle? Enter it below to support them.
+          </p>
+          <div style={{ display: 'flex', gap: '0.5rem' }}>
+            <input
+              type="text"
+              placeholder="e.g. gam"
+              id="find-handle-input"
+              style={{ flex: 1, padding: '0.75rem', borderRadius: '12px', border: '1px solid var(--card-border)', background: 'transparent', fontSize: '0.9rem' }}
+            />
+            <button
+              className="btn btn-primary"
+              style={{ padding: '0.75rem 1rem', flexShrink: 0 }}
+              onClick={() => {
+                const val = (document.getElementById('find-handle-input') as HTMLInputElement)?.value?.trim().replace(/^@/, '');
+                if (val) window.location.href = `/?p=${val}`;
+              }}
+            >
+              Go
+            </button>
+          </div>
+        </div>
       </div>
     );
   }
