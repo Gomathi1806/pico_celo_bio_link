@@ -192,28 +192,30 @@ export default function HomePage() {
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
             {fanLinks.map((link: PicoLink) => (
-              <Link key={link.id} href={inMiniPay ? `/c/${link.id}` : '#'} style={{ textDecoration: 'none', color: 'white' }}
-                onClick={!inMiniPay ? (e) => { e.preventDefault(); window.scrollTo({ top: 0, behavior: 'smooth' }); } : undefined}
-              >
-                <div className="glass" style={{ padding: '1.1rem 1.25rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.9rem', flex: 1, minWidth: 0 }}>
-                    <span style={{ fontSize: '1.4rem', flexShrink: 0 }}>{TYPE_EMOJI_FAN[link.type] ?? '🎁'}</span>
-                    <div style={{ minWidth: 0 }}>
-                      <div style={{ fontWeight: 700, fontSize: '0.95rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{link.title}</div>
-                      {link.description && (
-                        <div style={{ color: 'var(--text-muted)', fontSize: '0.78rem', marginTop: '0.15rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{link.description}</div>
-                      )}
-                      {link.salesCount > 0 && (
-                        <div style={{ color: 'var(--accent-celo)', fontSize: '0.68rem', fontWeight: 700, marginTop: '0.2rem' }}>{link.salesCount} supporter{link.salesCount !== 1 ? 's' : ''}</div>
-                      )}
+              <div key={link.id}>
+                <Link href={inMiniPay ? `/c/${link.id}` : '#'} style={{ textDecoration: 'none', color: 'white' }}
+                  onClick={!inMiniPay ? (e) => { e.preventDefault(); window.scrollTo({ top: 0, behavior: 'smooth' }); } : undefined}
+                >
+                  <div className="glass" style={{ padding: '1.1rem 1.25rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: inMiniPay ? 'pointer' : 'default', opacity: inMiniPay ? 1 : 0.75 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.9rem', flex: 1, minWidth: 0 }}>
+                      <span style={{ fontSize: '1.4rem', flexShrink: 0 }}>{TYPE_EMOJI_FAN[link.type] ?? '🎁'}</span>
+                      <div style={{ minWidth: 0 }}>
+                        <div style={{ fontWeight: 700, fontSize: '0.95rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{link.title}</div>
+                        {!inMiniPay && (
+                          <div style={{ color: 'var(--accent-celo)', fontSize: '0.7rem', fontWeight: 700, marginTop: '0.15rem' }}>🔒 Open in MiniPay to pay</div>
+                        )}
+                        {link.salesCount > 0 && (
+                          <div style={{ color: 'var(--accent-celo)', fontSize: '0.68rem', fontWeight: 700, marginTop: '0.2rem' }}>{link.salesCount} supporter{link.salesCount !== 1 ? 's' : ''}</div>
+                        )}
+                      </div>
+                    </div>
+                    <div style={{ textAlign: 'right', flexShrink: 0, marginLeft: '1rem' }}>
+                      <div style={{ fontWeight: 800, fontSize: '1.1rem', color: 'var(--accent-celo)' }}>${link.price}</div>
+                      <div style={{ color: 'var(--text-muted)', fontSize: '0.65rem' }}>{TOKEN_LABELS[link.token] ?? link.token}</div>
                     </div>
                   </div>
-                  <div style={{ textAlign: 'right', flexShrink: 0, marginLeft: '1rem' }}>
-                    <div style={{ fontWeight: 800, fontSize: '1.1rem', color: 'var(--accent-celo)' }}>${link.price}</div>
-                    <div style={{ color: 'var(--text-muted)', fontSize: '0.65rem' }}>{TOKEN_LABELS[link.token] ?? link.token}</div>
-                  </div>
-                </div>
-              </Link>
+                </Link>
+              </div>
             ))}
           </div>
         )}
@@ -267,55 +269,15 @@ export default function HomePage() {
       <div className="animate-fade" style={{ textAlign: 'center', paddingTop: '3rem' }}>
         <div style={{ fontSize: '3rem', marginBottom: '1.25rem' }}>🍵</div>
         <h1 style={{ fontSize: '1.6rem', fontWeight: 800, marginBottom: '0.5rem' }}>Pico</h1>
-        <p style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '0.5rem' }}>
-          Get paid by your fans
-        </p>
-        <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', lineHeight: 1.7, maxWidth: '280px', margin: '0 auto 2rem' }}>
-          Like "Buy Me a Tea" — but payments go straight to your MiniPay wallet in USDm. No bank. No Stripe.
+        <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', lineHeight: 1.7, maxWidth: '280px', margin: '0 auto 1.5rem' }}>
+          Support creators with stablecoin payments on Celo — no bank, no Stripe.
         </p>
 
-        <div className="glass" style={{ padding: '1.5rem', marginBottom: '1.5rem', textAlign: 'left' }}>
-          {[
-            { n: '1', t: 'Open Pico inside the MiniPay app' },
-            { n: '2', t: 'Set your name, purpose and price' },
-            { n: '3', t: 'Share your link. Fans pay in USDm.' },
-          ].map(s => (
-            <div key={s.n} style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1rem' }}>
-              <div style={{
-                width: 28, height: 28, borderRadius: '50%', flexShrink: 0,
-                background: 'rgba(53,208,127,0.15)', border: '1px solid rgba(53,208,127,0.3)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                fontSize: '0.8rem', fontWeight: 800, color: 'var(--accent-celo)',
-              }}>{s.n}</div>
-              <p style={{ fontSize: '0.9rem', lineHeight: 1.4 }}>{s.t}</p>
-            </div>
-          ))}
-        </div>
-
-        <div className="glass" style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '0.75rem', marginBottom: '1.5rem' }}>
-          <p style={{ fontWeight: 700, fontSize: '0.9rem' }}>Web Browser Wallet Connection</p>
-          <p style={{ color: 'var(--text-muted)', fontSize: '0.8rem', lineHeight: 1.5 }}>
-            To create and manage support links, connect your browser wallet extension (such as MetaMask) on the Celo network.
-          </p>
-          
-          {hasInjected ? (
-            <button className="btn btn-primary" onClick={handleConnectWallet} style={{ width: '100%' }}>
-              🔌 Connect Wallet
-            </button>
-          ) : (
-            <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid var(--card-border)', borderRadius: '12px', padding: '0.85rem', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-              No web3 wallet detected. Please install MetaMask or open this URL inside the MiniPay wallet.
-            </div>
-          )}
-        </div>
-
-        {error && <p style={{ color: '#ef4444', fontSize: '0.82rem', marginBottom: '1.5rem' }}>{error}</p>}
-
-        {/* Find a creator */}
-        <div className="glass" style={{ padding: '1.5rem', marginTop: '1rem' }}>
-          <p style={{ fontWeight: 700, fontSize: '0.9rem', marginBottom: '0.5rem' }}>Find a Creator</p>
+        {/* Fan path — prominent at top */}
+        <div className="glass" style={{ padding: '1.5rem', marginBottom: '1.25rem', background: 'rgba(53,208,127,0.05)', border: '1px solid rgba(53,208,127,0.25)' }}>
+          <p style={{ fontWeight: 700, fontSize: '0.95rem', marginBottom: '0.25rem' }}>Support a Creator</p>
           <p style={{ color: 'var(--text-muted)', fontSize: '0.8rem', marginBottom: '0.75rem' }}>
-            Have a creator's handle? Enter it below to support them.
+            Enter the creator's handle to pay them directly.
           </p>
           <div style={{ display: 'flex', gap: '0.5rem' }}>
             <input
@@ -336,6 +298,33 @@ export default function HomePage() {
             </button>
           </div>
         </div>
+
+        {/* Creator path */}
+        <div className="glass" style={{ padding: '1.5rem', marginBottom: '1.25rem', textAlign: 'left' }}>
+          <p style={{ fontWeight: 700, fontSize: '0.95rem', marginBottom: '1rem' }}>Are you a creator?</p>
+          {[
+            { n: '1', t: 'Open Pico inside the MiniPay app' },
+            { n: '2', t: 'Set your name, purpose and price' },
+            { n: '3', t: 'Share your link. Fans pay in USDm.' },
+          ].map(s => (
+            <div key={s.n} style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '0.75rem' }}>
+              <div style={{
+                width: 28, height: 28, borderRadius: '50%', flexShrink: 0,
+                background: 'rgba(53,208,127,0.15)', border: '1px solid rgba(53,208,127,0.3)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: '0.8rem', fontWeight: 800, color: 'var(--accent-celo)',
+              }}>{s.n}</div>
+              <p style={{ fontSize: '0.88rem', lineHeight: 1.4 }}>{s.t}</p>
+            </div>
+          ))}
+          {hasInjected && (
+            <button className="btn btn-secondary" onClick={handleConnectWallet} style={{ width: '100%', marginTop: '0.5rem' }}>
+              🔌 Connect Wallet to Create Page
+            </button>
+          )}
+        </div>
+
+        {error && <p style={{ color: '#ef4444', fontSize: '0.82rem', marginBottom: '1.5rem' }}>{error}</p>}
       </div>
     );
   }
