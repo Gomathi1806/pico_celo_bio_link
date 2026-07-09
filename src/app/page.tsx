@@ -36,6 +36,7 @@ export default function HomePage() {
   const [price, setPrice]       = useState('2');
   const [customPrice, setCustomPrice] = useState('');
   const [token, setToken]       = useState<TokenSymbol>(DEFAULT_TOKEN);
+  const [contentUrl, setContentUrl] = useState('');
   const [error, setError]       = useState('');
   const [copied, setCopied]     = useState(false);
 
@@ -109,6 +110,7 @@ export default function HomePage() {
         purpose: purpose.trim(),
         price: finalPrice,
         token,
+        contentUrl: contentUrl.trim() || undefined,
       });
       if (res.success && res.linkId) {
         setNewLinkId(res.linkId);
@@ -417,6 +419,13 @@ export default function HomePage() {
             onChange={e => setPurpose(e.target.value)}
             style={{ width: '100%', marginBottom: '0.75rem', padding: '0.85rem', borderRadius: '12px', border: '1px solid var(--card-border)', background: 'transparent', boxSizing: 'border-box' }}
           />
+          <input
+            type="url"
+            placeholder="🔒 Resource link (optional — revealed after payment)"
+            value={contentUrl}
+            onChange={e => setContentUrl(e.target.value)}
+            style={{ width: '100%', marginBottom: '0.75rem', padding: '0.85rem', borderRadius: '12px', border: '1px solid var(--card-border)', background: 'transparent', fontSize: '0.85rem', boxSizing: 'border-box' }}
+          />
           <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.75rem' }}>
             {PRICE_PRESETS.map(p => (
               <button key={p} onClick={() => { setPrice(p); setCustomPrice(''); }}
@@ -453,6 +462,7 @@ export default function HomePage() {
                   purpose: purpose.trim(),
                   price: finalPrice,
                   token,
+                  contentUrl: contentUrl.trim() || undefined,
                 });
                 if (res.success && res.linkId) { setNewLinkId(res.linkId); if (res.handle) setCreatorHandle(res.handle); setStage('done'); }
                 else { setError(res.error ?? 'Failed. Try again.'); setStage('returning'); }
@@ -614,6 +624,23 @@ export default function HomePage() {
           </div>
           <p style={{ color: 'var(--text-muted)', fontSize: '0.7rem', marginTop: '0.4rem' }}>
             Fan can also choose a different token at payment time
+          </p>
+        </div>
+
+        {/* Resource URL */}
+        <div style={{ marginBottom: '1.25rem' }}>
+          <label style={{ display: 'block', color: 'var(--text-muted)', fontSize: '0.72rem', fontWeight: 700, letterSpacing: '0.08em', marginBottom: '0.5rem' }}>
+            🔒 RESOURCE LINK <span style={{ fontWeight: 400 }}>(optional — revealed after payment)</span>
+          </label>
+          <input
+            type="url"
+            placeholder="Google Drive, Notion, Calendly, YouTube…"
+            value={contentUrl}
+            onChange={e => setContentUrl(e.target.value)}
+            style={{ width: '100%', padding: '0.9rem', borderRadius: '12px', border: '1px solid var(--card-border)', background: 'transparent', fontSize: '0.9rem', boxSizing: 'border-box' }}
+          />
+          <p style={{ color: 'var(--text-muted)', fontSize: '0.7rem', marginTop: '0.4rem' }}>
+            Hidden from fans until they pay. Leave blank for simple tips.
           </p>
         </div>
 

@@ -131,6 +131,7 @@ export async function createCreatorWithLink(data: {
   purpose: string;
   price: string;
   token?: string;
+  contentUrl?: string;
 }): Promise<{ success: boolean; linkId?: string; handle?: string; error?: string }> {
   try {
     // Validate wallet address
@@ -194,8 +195,9 @@ export async function createCreatorWithLink(data: {
       title: data.purpose,
       description: '',
       price: priceDecimal,
-      type: 'tip',
+      type: data.contentUrl ? 'other' : 'tip',
       token: data.token ?? 'USDC',
+      contentUrl: data.contentUrl ?? '',
     }).returning();
 
     revalidatePath('/dashboard');
