@@ -272,6 +272,35 @@ export default function DashboardPage() {
         )}
       </div>
 
+      {/* Embed widget */}
+      {creator && (
+        <div className="glass" style={{ padding: '1.25rem', marginTop: '1rem' }}>
+          <p style={{ fontWeight: 700, fontSize: '0.88rem', marginBottom: '0.35rem' }}>🖼️ Embed on your website</p>
+          <p style={{ color: 'var(--text-muted)', fontSize: '0.75rem', marginBottom: '0.75rem' }}>
+            Paste this code on any website to show your Pico page inline.
+          </p>
+          <div style={{
+            background: 'rgba(0,0,0,0.3)', border: '1px solid var(--card-border)',
+            borderRadius: '10px', padding: '0.75rem', fontSize: '0.7rem',
+            fontFamily: 'monospace', color: '#35d07f', wordBreak: 'break-all',
+            marginBottom: '0.75rem', lineHeight: 1.6,
+          }}>
+            {`<iframe src="https://pico-celo-bio-link.vercel.app/embed/${creator.handle}" width="100%" height="480" frameborder="0" style="border-radius:16px;"></iframe>`}
+          </div>
+          <button
+            className="btn btn-secondary"
+            style={{ width: '100%', fontSize: '0.8rem', padding: '0.5rem' }}
+            onClick={() => {
+              navigator.clipboard.writeText(`<iframe src="https://pico-celo-bio-link.vercel.app/embed/${creator.handle}" width="100%" height="480" frameborder="0" style="border-radius:16px;"></iframe>`);
+              setCopied(true);
+              setTimeout(() => setCopied(false), 2000);
+            }}
+          >
+            {copied ? '✓ Copied!' : '📋 Copy Embed Code'}
+          </button>
+        </div>
+      )}
+
       {/* Edit bio */}
       <div style={{ marginTop: '1rem' }}>
         <Link href="/dashboard/profile" className="btn btn-secondary"
