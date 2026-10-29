@@ -6,6 +6,7 @@ import { detectWallet, connectMiniPay, sendToken, TOKENS, ALL_TOKENS, DEFAULT_TO
 import { MINIPAY_TOKENS } from '@/lib/tokens';
 import { getLinkWithCreator, hasPurchased, recordPurchase } from '@/app/actions/creator';
 import type { PicoLink } from '@/db/schema';
+import ClaimGD from '@/components/ClaimGD';
 
 const TYPE_EMOJI: Record<string, string> = {
   tip: '🍵', coffee: '🍵', pdf: '📄', guide: '📘',
@@ -22,6 +23,7 @@ export default function SupportPage(props: { params: Promise<{ id: string }> }) 
 
   const [link, setLink]               = useState<PicoLink | null>(null);
   const [creatorWallet, setCreatorWallet] = useState<`0x${string}` | ''>('');
+  const [creatorHandle, setCreatorHandle] = useState('');
   const [state, setState]             = useState<UIState>('loading');
   const [contentUrl, setContentUrl]   = useState('');
   const [thankYou, setThankYou]       = useState('');
@@ -34,6 +36,7 @@ export default function SupportPage(props: { params: Promise<{ id: string }> }) 
       if (!result) { setState('idle'); return; }
       setLink(result.link);
       setCreatorWallet(result.creatorWallet);
+      setCreatorHandle(result.creatorHandle);
       // Use the creator's preferred token as default
       const preferred = (result.link.token ?? DEFAULT_TOKEN) as TokenSymbol;
       setSelectedToken(preferred);
@@ -357,6 +360,16 @@ export default function SupportPage(props: { params: Promise<{ id: string }> }) 
           </div>
         )}
       </div>
+
+      {/* G$ Claim & Tip */}
+      {creatorWallet && creatorHandle && (
+        <div style={{ marginTop: '1.25rem' }}>
+          <ClaimGD
+            creatorWallet={creatorWallet as `0x${string}`}
+            creatorHandle={creatorHandle}
+          />
+        </div>
+      )}
 
       <footer style={{ marginTop: '3rem', textAlign: 'center', paddingBottom: '3rem' }}>
         <Link href="/" style={{ textDecoration: 'none' }}>

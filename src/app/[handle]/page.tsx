@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { getCreatorByHandle, getCreatorLinks } from '@/app/actions/creator';
 import type { PicoLink } from '@/db/schema';
+import ClaimGD from '@/components/ClaimGD';
 
 export const dynamic = 'force-dynamic';
 
@@ -105,6 +106,14 @@ export default async function CreatorBioPage(props: { params: Promise<{ handle: 
           })}
         </div>
       )}
+
+      {/* G$ Claim & Tip */}
+      <div style={{ marginTop: '1.25rem' }}>
+        <ClaimGD
+          creatorWallet={creator.walletAddress as `0x${string}`}
+          creatorHandle={creator.handle}
+        />
+      </div>
 
       {/* Footer */}
       <footer style={{ marginTop: '3rem', textAlign: 'center', paddingBottom: '3rem' }}>

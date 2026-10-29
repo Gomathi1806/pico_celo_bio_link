@@ -219,7 +219,7 @@ export async function getLinkWithCreator(id: string) {
     if (!link) return null;
     const creator = await db.query.creators.findFirst({ where: eq(creators.id, link.creatorId) });
     if (!creator) return null;
-    return { link, creatorWallet: creator.walletAddress as `0x${string}` };
+    return { link, creatorWallet: creator.walletAddress as `0x${string}`, creatorHandle: creator.handle };
   } catch (e) {
     console.error('[getLinkWithCreator] error:', e);
     return null;
