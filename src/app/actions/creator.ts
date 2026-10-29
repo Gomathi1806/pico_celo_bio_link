@@ -4,6 +4,7 @@ import { getDb } from '@/db';
 import { creators, picoLinks, purchases } from '@/db/schema';
 import { eq, desc } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
+import { recordStreakActivity } from './streaks';
 
 export async function getOrCreateCreator(walletAddress: string, handle?: string) {
   const db = getDb();
@@ -104,6 +105,10 @@ export async function recordPurchase(data: {
       await db.update(picoLinks)
         .set({ salesCount: (link.salesCount ?? 0) + 1, totalEarnings: newEarnings })
         .where(eq(picoLinks.id, data.linkId));
+    }
+
+    if (link) {
+      await recordStreakActivity(data.buyerAddress, link.creatorId).catch(() => {});
     }
 
     return { success: true };
@@ -219,7 +224,7 @@ export async function getLinkWithCreator(id: string) {
     if (!link) return null;
     const creator = await db.query.creators.findFirst({ where: eq(creators.id, link.creatorId) });
     if (!creator) return null;
-    return { link, creatorWallet: creator.walletAddress as `0x${string}` };
+    return { link, creatorWallet: creator.walletAddress as `0x${string}`, creatorHandle: creator.handle };
   } catch (e) {
     console.error('[getLinkWithCreator] error:', e);
     return null;
