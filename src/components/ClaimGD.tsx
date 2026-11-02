@@ -8,9 +8,11 @@ import { recordGdTip } from '@/app/actions/creator';
 interface ClaimGDProps {
   creatorWallet: `0x${string}`;
   creatorHandle: string;
+  gateMode?: boolean;
+  onUnlock?: (txHash: string) => void;
 }
 
-export default function ClaimGD({ creatorWallet, creatorHandle }: ClaimGDProps) {
+export default function ClaimGD({ creatorWallet, creatorHandle, gateMode, onUnlock }: ClaimGDProps) {
   const [claimStatus, setClaimStatus] = useState<ClaimStatus>({ status: 'not_connected' });
   const [tipSent, setTipSent] = useState(false);
   const [tipTxHash, setTipTxHash] = useState('');
@@ -67,6 +69,7 @@ export default function ClaimGD({ creatorWallet, creatorHandle }: ClaimGDProps) 
         amount: claimStatus.amount,
         txHash,
       }).catch(() => {});
+      onUnlock?.(txHash);
     } catch (err) {
       const msg = err instanceof Error ? err.message : '';
       if (!msg.toLowerCase().includes('cancel') && !msg.toLowerCase().includes('denied')) {
@@ -75,9 +78,11 @@ export default function ClaimGD({ creatorWallet, creatorHandle }: ClaimGDProps) 
     } finally {
       setSending(false);
     }
-  }, [claimStatus, creatorWallet, creatorHandle]);
+  }, [claimStatus, creatorWallet, creatorHandle, onUnlock]);
 
-  if (tipSent) {
+  const actionLabel = gateMode ? 'Unlock' : 'Tip';
+
+  if (tipSent && !gateMode) {
     return (
       <div className="glass" style={{ padding: '1.5rem', textAlign: 'center' }}>
         <div style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>💚</div>
@@ -107,14 +112,18 @@ export default function ClaimGD({ creatorWallet, creatorHandle }: ClaimGDProps) 
         display: 'flex', alignItems: 'center', gap: '0.5rem',
         justifyContent: 'center', marginBottom: '0.75rem',
       }}>
-        <span style={{ fontSize: '1.2rem' }}>🌍</span>
-        <span style={{ fontWeight: 700, fontSize: '0.9rem' }}>Free G$ Tip</span>
+        <span style={{ fontSize: '1.2rem' }}>{gateMode ? '🔓' : '🌍'}</span>
+        <span style={{ fontWeight: 700, fontSize: '0.9rem' }}>
+          {gateMode ? 'G$ Unlock' : 'Free G$ Tip'}
+        </span>
       </div>
 
       {claimStatus.status === 'not_connected' && (
         <>
           <p style={{ color: 'var(--text-muted)', fontSize: '0.78rem', lineHeight: 1.5, marginBottom: '0.75rem' }}>
-            Claim your free daily G$ (GoodDollar UBI) and tip @{creatorHandle} — costs you nothing.
+            {gateMode
+              ? `Claim your free daily G$ (GoodDollar UBI) and tip @${creatorHandle} to unlock this content — costs you nothing.`
+              : `Claim your free daily G$ (GoodDollar UBI) and tip @${creatorHandle} — costs you nothing.`}
           </p>
           <button
             className="btn btn-secondary"
@@ -154,14 +163,16 @@ export default function ClaimGD({ creatorWallet, creatorHandle }: ClaimGDProps) 
         <>
           <p style={{ color: 'var(--text-muted)', fontSize: '0.78rem', lineHeight: 1.5, marginBottom: '0.75rem' }}>
             You can claim <strong style={{ color: 'var(--accent-celo)' }}>{claimStatus.amount} G$</strong> today.
-            Claim it and tip @{creatorHandle} for free!
+            {gateMode
+              ? ` Claim & tip to unlock this content!`
+              : ` Claim it and tip @${creatorHandle} for free!`}
           </p>
           <button
-            className="btn btn-primary"
+            className={gateMode ? 'btn btn-primary' : 'btn btn-primary'}
             onClick={handleClaim}
             style={{ width: '100%', fontSize: '0.9rem' }}
           >
-            🌍 Claim {claimStatus.amount} G$ & Tip
+            🌍 Claim {claimStatus.amount} G$ & {actionLabel}
           </button>
         </>
       )}
@@ -177,7 +188,7 @@ export default function ClaimGD({ creatorWallet, creatorHandle }: ClaimGDProps) 
         <>
           <p style={{ fontSize: '0.78rem', lineHeight: 1.5, marginBottom: '0.75rem' }}>
             ✅ Claimed <strong style={{ color: 'var(--accent-celo)' }}>{claimStatus.amount} G$</strong>!
-            Now tip @{creatorHandle}?
+            {gateMode ? ' Tip to unlock content?' : ` Now tip @${creatorHandle}?`}
           </p>
           {tipError && (
             <p style={{ color: '#ef4444', fontSize: '0.72rem', marginBottom: '0.5rem' }}>{tipError}</p>
@@ -189,9 +200,9 @@ export default function ClaimGD({ creatorWallet, creatorHandle }: ClaimGDProps) 
             style={{ width: '100%', fontSize: '0.9rem' }}
           >
             {sending ? (
-              <><div className="spinner" /> Sending G$ tip…</>
+              <><div className="spinner" /> Sending G$…</>
             ) : (
-              `💚 Tip ${claimStatus.amount} G$ to @${creatorHandle}`
+              `💚 ${actionLabel} with ${claimStatus.amount} G$`
             )}
           </button>
         </>

@@ -7,11 +7,12 @@ import { detectWallet, connectMiniPay } from '@/lib/minipay';
 import { getCreatorByWallet, createPicoLink } from '@/app/actions/creator';
 
 const ITEM_TYPES = [
-  { value: 'tip',   emoji: '🍵', label: 'Tip / Tea',   hint: 'Simple support, no reward' },
-  { value: 'pdf',   emoji: '📄', label: 'PDF / eBook',    hint: 'Share a file link after payment' },
-  { value: 'guide', emoji: '📘', label: 'Guide / Course', hint: 'Tutorial, notes, video link' },
-  { value: 'call',  emoji: '🎯', label: 'Booking / Call', hint: 'Calendly or WhatsApp link' },
-  { value: 'other', emoji: '🎁', label: 'Other',          hint: 'Anything else' },
+  { value: 'tip',     emoji: '🍵', label: 'Tip / Tea',       hint: 'Simple support, no reward' },
+  { value: 'gd_gate', emoji: '🌍', label: 'G$ Gated Content', hint: 'Free unlock via GoodDollar UBI tip' },
+  { value: 'pdf',     emoji: '📄', label: 'PDF / eBook',      hint: 'Share a file link after payment' },
+  { value: 'guide',   emoji: '📘', label: 'Guide / Course',   hint: 'Tutorial, notes, video link' },
+  { value: 'call',    emoji: '🎯', label: 'Booking / Call',   hint: 'Calendly or WhatsApp link' },
+  { value: 'other',   emoji: '🎁', label: 'Other',            hint: 'Anything else' },
 ];
 
 export default function NewItemPage() {
@@ -27,6 +28,7 @@ export default function NewItemPage() {
   const [error, setError] = useState('');
 
   const isTip = type === 'tip';
+  const isGdGate = type === 'gd_gate';
 
   useEffect(() => {
     detectWallet().then(async (found) => {
@@ -46,6 +48,7 @@ export default function NewItemPage() {
   useEffect(() => {
     const defaults: Record<string, string> = {
       tip: 'Buy me a tea 🍵',
+      gd_gate: '',
       pdf: '',
       guide: '',
       call: 'Book a 15-min call',
@@ -56,18 +59,21 @@ export default function NewItemPage() {
   }, [type]);
 
   const handleSubmit = async () => {
-    if (!title || !price || !creatorId) { setError('Please fill in a title and price.'); return; }
-    const p = parseFloat(price);
-    if (isNaN(p) || p < 0.01) { setError('Minimum price is $0.01.'); return; }
+    if (!title || !creatorId) { setError('Please fill in a title.'); return; }
+    if (!isGdGate) {
+      const p = parseFloat(price);
+      if (isNaN(p) || p < 0.01) { setError('Minimum price is $0.01.'); return; }
+    }
     if (!isTip && !contentUrl) { setError('Please add a content URL (the link you\'ll share after payment).'); return; }
 
     setSaving(true);
     setError('');
+    const finalPrice = isGdGate ? '0.00' : parseFloat(price).toFixed(2);
     const res = await createPicoLink({
       creatorId,
       title,
       description,
-      price: p.toFixed(2),
+      price: finalPrice,
       contentUrl: contentUrl || '',
       type,
       thankYouMessage,
@@ -139,7 +145,8 @@ export default function NewItemPage() {
             style={{ width: '100%', padding: '0.9rem', resize: 'none' }} />
         </div>
 
-        {/* Price */}
+        {/* Price — hidden for G$ gated */}
+        {!isGdGate && (
         <div>
           <label style={{ display: 'block', color: 'var(--text-muted)', fontSize: '0.72rem', fontWeight: 700, letterSpacing: '0.08em', marginBottom: '0.5rem' }}>
             PRICE (USD value)
@@ -162,8 +169,15 @@ export default function NewItemPage() {
             ))}
           </div>
         </div>
+        )}
 
-        {/* Content URL — only if not a tip */}
+        {isGdGate && (
+          <div style={{ background: 'rgba(53,208,127,0.06)', border: '1px solid rgba(53,208,127,0.2)', borderRadius: '12px', padding: '0.85rem', fontSize: '0.8rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>
+            🌍 <strong style={{ color: 'white' }}>Free with G$</strong> — fans unlock this by claiming their daily GoodDollar UBI and tipping you. No stablecoin payment needed.
+          </div>
+        )}
+
+        {/* Content URL — required for gd_gate and paid content, hidden for tips */}
         {!isTip && (
           <div>
             <label style={{ display: 'block', color: 'var(--text-muted)', fontSize: '0.72rem', fontWeight: 700, letterSpacing: '0.08em', marginBottom: '0.5rem' }}>

@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { detectWallet, connectMiniPay, disconnectMiniPay, isMiniPay, TOKENS, type TokenSymbol } from '@/lib/minipay';
-import { getOrCreateCreator, getCreatorLinks, getCreatorEarnings } from '@/app/actions/creator';
+import { getOrCreateCreator, getCreatorLinks, getCreatorEarnings, getCreatorGdStats } from '@/app/actions/creator';
 import type { Creator, PicoLink } from '@/db/schema';
 
 type Step = 'detecting' | 'no-minipay' | 'needs-handle' | 'ready';
@@ -11,6 +11,7 @@ type Step = 'detecting' | 'no-minipay' | 'needs-handle' | 'ready';
 const TYPE_EMOJI: Record<string, string> = {
   tip: '🍵', coffee: '🍵', pdf: '📄', guide: '📘',
   call: '🎯', audio: '🎙️', video: '🎬', other: '🎁',
+  gd_gate: '🌍',
 };
 
 export default function DashboardPage() {
@@ -18,6 +19,7 @@ export default function DashboardPage() {
   const [creator, setCreator] = useState<Creator | null>(null);
   const [links, setLinks] = useState<PicoLink[]>([]);
   const [earnings, setEarnings] = useState({ total: '0.00', sales: 0 });
+  const [gdStats, setGdStats] = useState({ totalGd: '0.00', tipCount: 0, uniqueTippers: 0 });
   const [handleInput, setHandleInput] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -25,9 +27,10 @@ export default function DashboardPage() {
   const [copied, setCopied] = useState(false);
 
   const loadDashboard = useCallback(async (c: Creator) => {
-    const [ls, e] = await Promise.all([getCreatorLinks(c.id), getCreatorEarnings(c.id)]);
+    const [ls, e, gd] = await Promise.all([getCreatorLinks(c.id), getCreatorEarnings(c.id), getCreatorGdStats(c.id)]);
     setLinks(ls);
     setEarnings(e);
+    setGdStats(gd);
   }, []);
 
   useEffect(() => {
@@ -224,6 +227,29 @@ export default function DashboardPage() {
           <p style={{ fontSize: '1.5rem', fontWeight: 800 }}>{earnings.sales}</p>
         </div>
       </div>
+
+      {/* G$ Stats */}
+      {(gdStats.tipCount > 0) && (
+        <div className="glass" style={{ padding: '1.25rem', marginBottom: '1.25rem', background: 'rgba(53,208,127,0.03)', border: '1px solid rgba(53,208,127,0.15)' }}>
+          <p style={{ color: 'var(--text-muted)', fontSize: '0.72rem', fontWeight: 700, letterSpacing: '0.08em', marginBottom: '0.75rem' }}>
+            🌍 G$ UBI TIPS
+          </p>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.75rem' }}>
+            <div>
+              <p style={{ fontSize: '1.2rem', fontWeight: 800, color: 'var(--accent-celo)' }}>{gdStats.totalGd}</p>
+              <p style={{ color: 'var(--text-muted)', fontSize: '0.68rem' }}>G$ received</p>
+            </div>
+            <div>
+              <p style={{ fontSize: '1.2rem', fontWeight: 800 }}>{gdStats.tipCount}</p>
+              <p style={{ color: 'var(--text-muted)', fontSize: '0.68rem' }}>tips</p>
+            </div>
+            <div>
+              <p style={{ fontSize: '1.2rem', fontWeight: 800 }}>{gdStats.uniqueTippers}</p>
+              <p style={{ color: 'var(--text-muted)', fontSize: '0.68rem' }}>tippers</p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Items */}
       <div className="glass" style={{ padding: '1.5rem' }}>

@@ -1,7 +1,7 @@
 'use server';
 
 import { getDb } from '@/db';
-import { creators, picoLinks, purchases, gdTips } from '@/db/schema';
+import { creators, picoLinks, purchases, gdTips, gdUnlocks } from '@/db/schema';
 import { eq, desc } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
 import { recordStreakActivity } from './streaks';
@@ -270,4 +270,57 @@ export async function recordGdTip(data: {
     console.error('[recordGdTip] error:', e);
     return { success: false, error: 'Failed to record tip' };
   }
+}
+
+export async function hasGdUnlocked(linkId: string, buyerAddress: string) {
+  const db = getDb();
+  const unlock = await db.query.gdUnlocks.findFirst({
+    where: (t, { and, eq }) => and(
+      eq(t.linkId, linkId),
+      eq(t.buyerAddress, buyerAddress.toLowerCase())
+    ),
+  });
+  return !!unlock;
+}
+
+export async function recordGdUnlock(data: {
+  linkId: string;
+  buyerAddress: string;
+  txHash: string;
+}) {
+  try {
+    const db = getDb();
+    const exists = await db.query.gdUnlocks.findFirst({
+      where: eq(gdUnlocks.txHash, data.txHash),
+    });
+    if (exists) return { success: true };
+
+    await db.insert(gdUnlocks).values({
+      linkId: data.linkId,
+      buyerAddress: data.buyerAddress.toLowerCase(),
+      txHash: data.txHash,
+    });
+
+    const link = await db.query.picoLinks.findFirst({ where: eq(picoLinks.id, data.linkId) });
+    if (link) {
+      await db.update(picoLinks)
+        .set({ salesCount: (link.salesCount ?? 0) + 1 })
+        .where(eq(picoLinks.id, data.linkId));
+    }
+
+    return { success: true };
+  } catch (e) {
+    console.error('[recordGdUnlock] error:', e);
+    return { success: false };
+  }
+}
+
+export async function getCreatorGdStats(creatorId: string) {
+  const db = getDb();
+  const tips = await db.query.gdTips.findMany({
+    where: eq(gdTips.creatorId, creatorId),
+  });
+  const totalGd = tips.reduce((sum, t) => sum + parseFloat(t.amount || '0'), 0);
+  const uniqueTippers = new Set(tips.map(t => t.senderAddress)).size;
+  return { totalGd: totalGd.toFixed(2), tipCount: tips.length, uniqueTippers };
 }
