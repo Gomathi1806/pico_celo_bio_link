@@ -1,18 +1,18 @@
 'use client';
 
 import React, { useState, useCallback } from 'react';
-import { checkGDEntitlement, claimGD, sendGD, type ClaimStatus } from '@/lib/gooddollar';
+import { checkGDEntitlement, claimGD, sendGD, isGdAvailable, type ClaimStatus } from '@/lib/gooddollar';
 import { connectMiniPay } from '@/lib/minipay';
-import { recordGdTip } from '@/app/actions/creator';
 
 interface ClaimGDProps {
   creatorWallet: `0x${string}`;
   creatorHandle: string;
   gateMode?: boolean;
-  onUnlock?: (txHash: string) => void;
+  linkId?: string;
+  onUnlock?: (data: { contentUrl: string; thankYouMessage: string }) => void;
 }
 
-export default function ClaimGD({ creatorWallet, creatorHandle, gateMode, onUnlock }: ClaimGDProps) {
+export default function ClaimGD({ creatorWallet, creatorHandle, gateMode, linkId, onUnlock }: ClaimGDProps) {
   const [claimStatus, setClaimStatus] = useState<ClaimStatus>({ status: 'not_connected' });
   const [tipSent, setTipSent] = useState(false);
   const [tipTxHash, setTipTxHash] = useState('');
@@ -59,17 +59,35 @@ export default function ClaimGD({ creatorWallet, creatorHandle, gateMode, onUnlo
     if (claimStatus.status !== 'claimed') return;
     try {
       setSending(true);
+      setTipError('');
       const { address } = await connectMiniPay();
       const txHash = await sendGD(address, creatorWallet, claimStatus.amount);
-      setTipTxHash(txHash);
-      setTipSent(true);
-      recordGdTip({
-        senderAddress: address,
-        creatorHandle,
-        amount: claimStatus.amount,
-        txHash,
-      }).catch(() => {});
-      onUnlock?.(txHash);
+
+      if (gateMode && linkId) {
+        // Server-side verification: confirms the G$ transfer on-chain,
+        // records the unlock, and only then returns contentUrl
+        const res = await fetch(`/api/gd-verify/${linkId}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ txHash }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error ?? 'Verification failed');
+        setTipTxHash(txHash);
+        setTipSent(true);
+        onUnlock?.({ contentUrl: data.contentUrl ?? '', thankYouMessage: data.thankYouMessage ?? '' });
+      } else {
+        // Non-gated tip: verify on server via gd-tip-verify
+        const res = await fetch('/api/gd-tip-verify', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ txHash, creatorHandle }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error ?? 'Tip verification failed');
+        setTipTxHash(txHash);
+        setTipSent(true);
+      }
     } catch (err) {
       const msg = err instanceof Error ? err.message : '';
       if (!msg.toLowerCase().includes('cancel') && !msg.toLowerCase().includes('denied')) {
@@ -78,9 +96,22 @@ export default function ClaimGD({ creatorWallet, creatorHandle, gateMode, onUnlo
     } finally {
       setSending(false);
     }
-  }, [claimStatus, creatorWallet, creatorHandle, onUnlock]);
+  }, [claimStatus, creatorWallet, creatorHandle, gateMode, linkId, onUnlock]);
 
   const actionLabel = gateMode ? 'Unlock' : 'Tip';
+
+  if (!isGdAvailable()) {
+    if (gateMode) {
+      return (
+        <div className="glass" style={{ padding: '1.25rem', textAlign: 'center' }}>
+          <p style={{ color: 'var(--text-muted)', fontSize: '0.82rem' }}>
+            G$ unlock is only available on Celo mainnet.
+          </p>
+        </div>
+      );
+    }
+    return null;
+  }
 
   if (tipSent && !gateMode) {
     return (
@@ -168,7 +199,7 @@ export default function ClaimGD({ creatorWallet, creatorHandle, gateMode, onUnlo
               : ` Claim it and tip @${creatorHandle} for free!`}
           </p>
           <button
-            className={gateMode ? 'btn btn-primary' : 'btn btn-primary'}
+            className="btn btn-primary"
             onClick={handleClaim}
             style={{ width: '100%', fontSize: '0.9rem' }}
           >
@@ -200,7 +231,7 @@ export default function ClaimGD({ creatorWallet, creatorHandle, gateMode, onUnlo
             style={{ width: '100%', fontSize: '0.9rem' }}
           >
             {sending ? (
-              <><div className="spinner" /> Sending G$…</>
+              <><div className="spinner" /> {gateMode ? 'Verifying on Celo…' : 'Sending G$…'}</>
             ) : (
               `💚 ${actionLabel} with ${claimStatus.amount} G$`
             )}

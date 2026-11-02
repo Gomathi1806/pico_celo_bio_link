@@ -216,8 +216,25 @@ export async function createCreatorWithLink(data: {
   }
 }
 
-/** Get a link AND the creator's wallet address (for direct payment) */
+/** Get a link AND the creator's wallet address (for direct payment).
+ *  contentUrl is NEVER sent to the client — only returned by server-side verify routes. */
 export async function getLinkWithCreator(id: string) {
+  try {
+    const db = getDb();
+    const link = await db.query.picoLinks.findFirst({ where: eq(picoLinks.id, id) });
+    if (!link) return null;
+    const creator = await db.query.creators.findFirst({ where: eq(creators.id, link.creatorId) });
+    if (!creator) return null;
+    const { contentUrl: _contentUrl, ...safeLink } = link;
+    return { link: safeLink as typeof link, creatorWallet: creator.walletAddress as `0x${string}`, creatorHandle: creator.handle };
+  } catch (e) {
+    console.error('[getLinkWithCreator] error:', e);
+    return null;
+  }
+}
+
+/** Server-only: get link with contentUrl (for verify routes). */
+export async function getLinkWithCreatorFull(id: string) {
   try {
     const db = getDb();
     const link = await db.query.picoLinks.findFirst({ where: eq(picoLinks.id, id) });
@@ -226,7 +243,7 @@ export async function getLinkWithCreator(id: string) {
     if (!creator) return null;
     return { link, creatorWallet: creator.walletAddress as `0x${string}`, creatorHandle: creator.handle };
   } catch (e) {
-    console.error('[getLinkWithCreator] error:', e);
+    console.error('[getLinkWithCreatorFull] error:', e);
     return null;
   }
 }
@@ -239,37 +256,6 @@ export async function getCreatorEarnings(creatorId: string) {
   const total = links.reduce((sum, l) => sum + parseFloat(l.totalEarnings ?? '0'), 0);
   const sales = links.reduce((sum, l) => sum + (l.salesCount ?? 0), 0);
   return { total: total.toFixed(2), sales };
-}
-
-export async function recordGdTip(data: {
-  senderAddress: string;
-  creatorHandle: string;
-  amount: string;
-  txHash: string;
-}) {
-  try {
-    const db = getDb();
-    const creator = await db.query.creators.findFirst({
-      where: eq(creators.handle, data.creatorHandle),
-    });
-    if (!creator) return { success: false, error: 'Creator not found' };
-
-    const exists = await db.query.gdTips.findFirst({
-      where: eq(gdTips.txHash, data.txHash),
-    });
-    if (exists) return { success: true };
-
-    await db.insert(gdTips).values({
-      senderAddress: data.senderAddress.toLowerCase(),
-      creatorId: creator.id,
-      amount: data.amount,
-      txHash: data.txHash,
-    });
-    return { success: true };
-  } catch (e) {
-    console.error('[recordGdTip] error:', e);
-    return { success: false, error: 'Failed to record tip' };
-  }
 }
 
 export async function hasGdUnlocked(linkId: string, buyerAddress: string) {

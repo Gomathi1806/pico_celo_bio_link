@@ -7,8 +7,17 @@ import { IdentitySDK, ClaimSDK, chainConfigs, SupportedChains, type ClaimEntitle
 const CELO_CHAIN_ID = SupportedChains.CELO;
 const GD_ENV = "production" as const;
 
+// G$ is mainnet-only — the SDK and token contract only work on Celo mainnet
 export const GD_TOKEN_ADDRESS = chainConfigs[CELO_CHAIN_ID].contracts.production!.g$Contract;
 export const GD_DECIMALS = 18;
+
+const NETWORK = (process.env.NEXT_PUBLIC_CELO_NETWORK ?? "celo-alfajores") as string;
+
+function assertMainnet() {
+  if (NETWORK !== "celo") {
+    throw new Error("G$ is only available on Celo mainnet");
+  }
+}
 
 export type ClaimStatus =
   | { status: "loading" }
@@ -37,8 +46,13 @@ function getWalletClient(account: `0x${string}`) {
   });
 }
 
+export function isGdAvailable(): boolean {
+  return NETWORK === "celo";
+}
+
 export async function checkGDEntitlement(account: `0x${string}`): Promise<ClaimStatus> {
   try {
+    assertMainnet();
     const publicClient = getPublicClient();
     const walletClient = getWalletClient(account);
 
@@ -96,6 +110,7 @@ export async function claimGD(account: `0x${string}`): Promise<{
   error?: string;
 }> {
   try {
+    assertMainnet();
     const publicClient = getPublicClient();
     const walletClient = getWalletClient(account);
 
@@ -134,6 +149,7 @@ export async function sendGD(
   to: `0x${string}`,
   amount: string
 ): Promise<`0x${string}`> {
+  assertMainnet();
   const provider = window.ethereum;
   if (!provider) throw new Error("Wallet not found");
 
@@ -155,8 +171,17 @@ export async function sendGD(
     args: [to, parseUnits(amount, GD_DECIMALS)],
   });
 
-  return (await provider.request({
+  const txHash = (await provider.request({
     method: "eth_sendTransaction",
     params: [{ from, to: GD_TOKEN_ADDRESS, data }],
   })) as `0x${string}`;
+
+  // Wait for receipt to confirm the transfer landed
+  const publicClient = getPublicClient();
+  const receipt = await publicClient.waitForTransactionReceipt({ hash: txHash });
+  if (receipt.status !== "success") {
+    throw new Error("G$ transfer reverted");
+  }
+
+  return txHash;
 }

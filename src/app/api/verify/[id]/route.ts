@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getLinkWithCreator } from "@/app/actions/creator";
+import { getLinkWithCreatorFull } from "@/app/actions/creator";
 import { verifyPayment } from "@/lib/payment";
 import { TOKENS, DEFAULT_TOKEN, type CeloNetwork, type TokenSymbol } from "@/lib/tokens";
 
@@ -33,10 +33,14 @@ export async function POST(
     return NextResponse.json({ error: `Unsupported token: ${token}` }, { status: 400 });
   }
 
-  const found = await getLinkWithCreator(id);
+  const found = await getLinkWithCreatorFull(id);
   if (!found) return NextResponse.json({ error: "Content not found" }, { status: 404 });
 
   const { link, creatorWallet } = found;
+
+  if (link.type === 'gd_gate') {
+    return NextResponse.json({ error: "G$-gated content must be unlocked via /api/gd-verify" }, { status: 400 });
+  }
 
   // Creator receives 99% — verify that amount hit their wallet
   const creatorAmount = parseFloat(link.price) * (1 - PLATFORM_FEE);

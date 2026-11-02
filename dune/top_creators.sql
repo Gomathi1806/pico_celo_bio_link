@@ -11,7 +11,7 @@ payments AS (
         t."to" AS creator,
         CASE
             WHEN t.contract_address = 0xcebA9300f2b948710d2653dD7B07f33A8B32118C THEN CAST(value AS DOUBLE) / 1e6
-            WHEN t.contract_address = 0x62B8B11039FcfE5aB0C56E502b1C372A3d2a9c7A THEN CAST(value AS DOUBLE) / 1e18 * 0.001
+            WHEN t.contract_address = 0x62B8B11039FcfE5aB0C56E502b1C372A3d2a9c7A THEN CAST(value AS DOUBLE) / 1e18 * 0.0001
             ELSE CAST(value AS DOUBLE) / 1e18
         END AS usd_approx,
         t."from" AS supporter

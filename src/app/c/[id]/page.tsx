@@ -4,7 +4,7 @@ import React, { useState, useEffect, useCallback, use } from 'react';
 import Link from 'next/link';
 import { detectWallet, connectMiniPay, sendToken, TOKENS, ALL_TOKENS, DEFAULT_TOKEN, type TokenSymbol, isMiniPay } from '@/lib/minipay';
 import { MINIPAY_TOKENS } from '@/lib/tokens';
-import { getLinkWithCreator, hasPurchased, recordPurchase, hasGdUnlocked, recordGdUnlock } from '@/app/actions/creator';
+import { getLinkWithCreator, hasPurchased, recordPurchase, hasGdUnlocked } from '@/app/actions/creator';
 import type { PicoLink } from '@/db/schema';
 import ClaimGD from '@/components/ClaimGD';
 
@@ -77,15 +77,11 @@ export default function SupportPage(props: { params: Promise<{ id: string }> }) 
     init();
   }, [id]);
 
-  const handleGdUnlock = useCallback(async (txHash: string) => {
-    try {
-      const { address } = await connectMiniPay();
-      await recordGdUnlock({ linkId: id, buyerAddress: address, txHash });
-    } catch { /* recorded server-side via gdTips already */ }
-    setContentUrl(link?.contentUrl ?? '');
-    setThankYou(link?.thankYouMessage ?? '');
+  const handleGdUnlock = useCallback((data: { contentUrl: string; thankYouMessage: string }) => {
+    setContentUrl(data.contentUrl);
+    setThankYou(data.thankYouMessage);
     setState('unlocked');
-  }, [id, link]);
+  }, []);
 
   const handlePay = async () => {
     if (!link || !creatorWallet) return;
@@ -312,6 +308,7 @@ export default function SupportPage(props: { params: Promise<{ id: string }> }) 
             creatorWallet={creatorWallet as `0x${string}`}
             creatorHandle={creatorHandle}
             gateMode
+            linkId={id}
             onUnlock={handleGdUnlock}
           />
         )}
