@@ -27,12 +27,12 @@ SELECT
         CAST(value AS DOUBLE) / POWER(10,
             CASE pt.symbol
                 WHEN 'USDC' THEN 6
-                WHEN 'GD' THEN 2
+                WHEN 'GD' THEN 18
                 ELSE 18
             END
         )
     ) AS volume
-FROM celo.erc20_celo.evt_Transfer t
+FROM erc20_celo.evt_transfer t
 INNER JOIN creator_wallets cw ON t."to" = cw.address
 INNER JOIN pico_tokens pt ON t.contract_address = pt.address
 WHERE evt_block_time >= NOW() - INTERVAL '90' DAY

@@ -20,7 +20,7 @@ first_support AS (
     SELECT
         t."from" AS supporter,
         MIN(date_trunc('week', evt_block_time)) AS first_week
-    FROM celo.erc20_celo.evt_Transfer t
+    FROM erc20_celo.evt_transfer t
     INNER JOIN creator_wallets cw ON t."to" = cw.address
     INNER JOIN pico_tokens pt ON t.contract_address = pt.address
     GROUP BY 1

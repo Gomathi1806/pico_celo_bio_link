@@ -11,11 +11,11 @@ payments AS (
         t."to" AS creator,
         CASE
             WHEN t.contract_address = 0xcebA9300f2b948710d2653dD7B07f33A8B32118C THEN CAST(value AS DOUBLE) / 1e6
-            WHEN t.contract_address = 0x62B8B11039FcfE5aB0C56E502b1C372A3d2a9c7A THEN CAST(value AS DOUBLE) / 100.0 * 0.001
+            WHEN t.contract_address = 0x62B8B11039FcfE5aB0C56E502b1C372A3d2a9c7A THEN CAST(value AS DOUBLE) / 1e18 * 0.001
             ELSE CAST(value AS DOUBLE) / 1e18
         END AS usd_approx,
         t."from" AS supporter
-    FROM celo.erc20_celo.evt_Transfer t
+    FROM erc20_celo.evt_transfer t
     INNER JOIN creator_wallets cw ON t."to" = cw.address
     WHERE t.contract_address IN (
         0xcebA9300f2b948710d2653dD7B07f33A8B32118C,

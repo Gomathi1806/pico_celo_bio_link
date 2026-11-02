@@ -1,4 +1,4 @@
-import { pgTable, text, timestamp, decimal, uuid, integer, date } from 'drizzle-orm/pg-core';
+import { pgTable, text, timestamp, decimal, uuid, integer, date, uniqueIndex } from 'drizzle-orm/pg-core';
 
 export const creators = pgTable('creators', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -41,6 +41,17 @@ export const streaks = pgTable('streaks', {
   lastActivityDate: date('last_activity_date'),
   totalInteractions: integer('total_interactions').notNull().default(0),
   updatedAt: timestamp('updated_at').defaultNow(),
+}, (table) => [
+  uniqueIndex('streaks_wallet_creator_idx').on(table.walletAddress, table.creatorId),
+]);
+
+export const gdTips = pgTable('gd_tips', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  senderAddress: text('sender_address').notNull(),
+  creatorId: uuid('creator_id').notNull().references(() => creators.id),
+  amount: text('amount').notNull(),
+  txHash: text('tx_hash').notNull().unique(),
+  createdAt: timestamp('created_at').defaultNow(),
 });
 
 export type Creator = typeof creators.$inferSelect;
@@ -49,3 +60,4 @@ export type PicoLink = typeof picoLinks.$inferSelect;
 export type NewPicoLink = typeof picoLinks.$inferInsert;
 export type Purchase = typeof purchases.$inferSelect;
 export type Streak = typeof streaks.$inferSelect;
+export type GdTip = typeof gdTips.$inferSelect;

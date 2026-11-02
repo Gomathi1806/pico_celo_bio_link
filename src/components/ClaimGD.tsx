@@ -3,6 +3,7 @@
 import React, { useState, useCallback } from 'react';
 import { checkGDEntitlement, claimGD, sendGD, type ClaimStatus } from '@/lib/gooddollar';
 import { connectMiniPay } from '@/lib/minipay';
+import { recordGdTip } from '@/app/actions/creator';
 
 interface ClaimGDProps {
   creatorWallet: `0x${string}`;
@@ -14,6 +15,7 @@ export default function ClaimGD({ creatorWallet, creatorHandle }: ClaimGDProps) 
   const [tipSent, setTipSent] = useState(false);
   const [tipTxHash, setTipTxHash] = useState('');
   const [sending, setSending] = useState(false);
+  const [tipError, setTipError] = useState('');
 
   const handleCheckClaim = useCallback(async () => {
     try {
@@ -59,15 +61,21 @@ export default function ClaimGD({ creatorWallet, creatorHandle }: ClaimGDProps) 
       const txHash = await sendGD(address, creatorWallet, claimStatus.amount);
       setTipTxHash(txHash);
       setTipSent(true);
+      recordGdTip({
+        senderAddress: address,
+        creatorHandle,
+        amount: claimStatus.amount,
+        txHash,
+      }).catch(() => {});
     } catch (err) {
       const msg = err instanceof Error ? err.message : '';
       if (!msg.toLowerCase().includes('cancel') && !msg.toLowerCase().includes('denied')) {
-        setClaimStatus({ status: 'error', message: msg || 'Tip failed' });
+        setTipError(msg || 'Tip failed');
       }
     } finally {
       setSending(false);
     }
-  }, [claimStatus, creatorWallet]);
+  }, [claimStatus, creatorWallet, creatorHandle]);
 
   if (tipSent) {
     return (
@@ -171,9 +179,12 @@ export default function ClaimGD({ creatorWallet, creatorHandle }: ClaimGDProps) 
             ✅ Claimed <strong style={{ color: 'var(--accent-celo)' }}>{claimStatus.amount} G$</strong>!
             Now tip @{creatorHandle}?
           </p>
+          {tipError && (
+            <p style={{ color: '#ef4444', fontSize: '0.72rem', marginBottom: '0.5rem' }}>{tipError}</p>
+          )}
           <button
             className="btn btn-primary"
-            onClick={handleTip}
+            onClick={() => { setTipError(''); handleTip(); }}
             disabled={sending}
             style={{ width: '100%', fontSize: '0.9rem' }}
           >

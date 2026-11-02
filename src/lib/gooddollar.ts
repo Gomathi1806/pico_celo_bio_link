@@ -8,7 +8,7 @@ const CELO_CHAIN_ID = SupportedChains.CELO;
 const GD_ENV = "production" as const;
 
 export const GD_TOKEN_ADDRESS = chainConfigs[CELO_CHAIN_ID].contracts.production!.g$Contract;
-export const GD_DECIMALS = 2; // G$ uses 2 decimals on Celo
+export const GD_DECIMALS = 18;
 
 export type ClaimStatus =
   | { status: "loading" }
@@ -114,9 +114,9 @@ export async function claimGD(account: `0x${string}`): Promise<{
       env: GD_ENV,
     });
 
-    const receipt = await claimSDK.claim();
     const entitlement = await claimSDK.checkEntitlement();
     const amount = formatUnits(entitlement.amount, GD_DECIMALS);
+    const receipt = await claimSDK.claim();
 
     return {
       success: true,

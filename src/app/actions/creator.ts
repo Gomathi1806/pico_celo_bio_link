@@ -1,7 +1,7 @@
 'use server';
 
 import { getDb } from '@/db';
-import { creators, picoLinks, purchases } from '@/db/schema';
+import { creators, picoLinks, purchases, gdTips } from '@/db/schema';
 import { eq, desc } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
 import { recordStreakActivity } from './streaks';
@@ -239,4 +239,35 @@ export async function getCreatorEarnings(creatorId: string) {
   const total = links.reduce((sum, l) => sum + parseFloat(l.totalEarnings ?? '0'), 0);
   const sales = links.reduce((sum, l) => sum + (l.salesCount ?? 0), 0);
   return { total: total.toFixed(2), sales };
+}
+
+export async function recordGdTip(data: {
+  senderAddress: string;
+  creatorHandle: string;
+  amount: string;
+  txHash: string;
+}) {
+  try {
+    const db = getDb();
+    const creator = await db.query.creators.findFirst({
+      where: eq(creators.handle, data.creatorHandle),
+    });
+    if (!creator) return { success: false, error: 'Creator not found' };
+
+    const exists = await db.query.gdTips.findFirst({
+      where: eq(gdTips.txHash, data.txHash),
+    });
+    if (exists) return { success: true };
+
+    await db.insert(gdTips).values({
+      senderAddress: data.senderAddress.toLowerCase(),
+      creatorId: creator.id,
+      amount: data.amount,
+      txHash: data.txHash,
+    });
+    return { success: true };
+  } catch (e) {
+    console.error('[recordGdTip] error:', e);
+    return { success: false, error: 'Failed to record tip' };
+  }
 }

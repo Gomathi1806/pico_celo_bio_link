@@ -12,9 +12,9 @@ gd_transfers AS (
         evt_block_time,
         "from" AS sender,
         "to" AS recipient,
-        CAST(value AS DOUBLE) / 100.0 AS gd_amount,
+        CAST(value AS DOUBLE) / 1e18 AS gd_amount,
         evt_tx_hash
-    FROM celo.erc20_celo.evt_Transfer
+    FROM erc20_celo.evt_transfer
     WHERE contract_address = 0x62B8B11039FcfE5aB0C56E502b1C372A3d2a9c7A
         AND evt_block_time >= NOW() - INTERVAL '90' DAY
 )

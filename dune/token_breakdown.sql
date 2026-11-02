@@ -21,7 +21,7 @@ SELECT
     pt.symbol AS token,
     COUNT(*) AS tx_count,
     COUNT(DISTINCT t."from") AS unique_payers
-FROM celo.erc20_celo.evt_Transfer t
+FROM erc20_celo.evt_transfer t
 INNER JOIN creator_wallets cw ON t."to" = cw.address
 INNER JOIN pico_tokens pt ON t.contract_address = pt.address
 WHERE evt_block_time >= NOW() - INTERVAL '90' DAY

@@ -48,16 +48,18 @@ export const TOKENS: Record<TokenSymbol, {
   GD: {
     address: {
       celo:             "0x62B8B11039FcfE5aB0C56E502b1C372A3d2a9c7A",
-      "celo-alfajores": "0x62B8B11039FcfE5aB0C56E502b1C372A3d2a9c7A",
+      "celo-alfajores": "0x03d3daB843e6c03b3d271eff9178e6A96c28D25f",
     },
-    decimals: 2,
+    decimals: 18,
     label: "G$",
     symbol: "G$",
   },
 };
 
 // MiniPay only supports USDC, USDT, and USDm — cEUR/cREAL shown in browser only
-export const ALL_TOKENS: TokenSymbol[] = ["USDC", "cUSD", "cEUR", "cREAL", "GD"];
+// GD is intentionally excluded from payment tokens — it's near-worthless UBI and
+// must not be selectable for paying for content (paywall bypass)
+export const ALL_TOKENS: TokenSymbol[] = ["USDC", "cUSD", "cEUR", "cREAL"];
 export const MINIPAY_TOKENS: TokenSymbol[] = ["USDC", "cUSD"];
 export const DEFAULT_TOKEN: TokenSymbol = "USDC";
 
