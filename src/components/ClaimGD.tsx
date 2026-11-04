@@ -1,0 +1,267 @@
+'use client';
+
+import React, { useState, useCallback } from 'react';
+import { checkGDEntitlement, claimGD, sendGD, isGdAvailable, type ClaimStatus } from '@/lib/gooddollar';
+import { connectMiniPay } from '@/lib/minipay';
+
+interface ClaimGDProps {
+  creatorWallet: `0x${string}`;
+  creatorHandle: string;
+  gateMode?: boolean;
+  linkId?: string;
+  onUnlock?: (data: { contentUrl: string; thankYouMessage: string }) => void;
+}
+
+export default function ClaimGD({ creatorWallet, creatorHandle, gateMode, linkId, onUnlock }: ClaimGDProps) {
+  const [claimStatus, setClaimStatus] = useState<ClaimStatus>({ status: 'not_connected' });
+  const [tipSent, setTipSent] = useState(false);
+  const [tipTxHash, setTipTxHash] = useState('');
+  const [sending, setSending] = useState(false);
+  const [tipError, setTipError] = useState('');
+
+  const handleCheckClaim = useCallback(async () => {
+    try {
+      setClaimStatus({ status: 'loading' });
+      const { address } = await connectMiniPay();
+      const result = await checkGDEntitlement(address);
+      setClaimStatus(result);
+    } catch (err) {
+      setClaimStatus({
+        status: 'error',
+        message: err instanceof Error ? err.message : 'Connection failed',
+      });
+    }
+  }, []);
+
+  const handleClaim = useCallback(async () => {
+    try {
+      setClaimStatus({ status: 'claiming' });
+      const { address } = await connectMiniPay();
+      const result = await claimGD(address);
+      if (result.success) {
+        setClaimStatus({
+          status: 'claimed',
+          amount: result.amount ?? '0',
+          txHash: result.txHash ?? '',
+        });
+      } else {
+        setClaimStatus({ status: 'error', message: result.error ?? 'Claim failed' });
+      }
+    } catch (err) {
+      setClaimStatus({
+        status: 'error',
+        message: err instanceof Error ? err.message : 'Claim failed',
+      });
+    }
+  }, []);
+
+  const handleTip = useCallback(async () => {
+    if (claimStatus.status !== 'claimed') return;
+    try {
+      setSending(true);
+      setTipError('');
+      const { address } = await connectMiniPay();
+      const txHash = await sendGD(address, creatorWallet, claimStatus.amount);
+
+      if (gateMode && linkId) {
+        // Server-side verification: confirms the G$ transfer on-chain,
+        // records the unlock, and only then returns contentUrl
+        const res = await fetch(`/api/gd-verify/${linkId}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ txHash }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error ?? 'Verification failed');
+        setTipTxHash(txHash);
+        setTipSent(true);
+        onUnlock?.({ contentUrl: data.contentUrl ?? '', thankYouMessage: data.thankYouMessage ?? '' });
+      } else {
+        // Non-gated tip: verify on server via gd-tip-verify
+        const res = await fetch('/api/gd-tip-verify', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ txHash, creatorHandle }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error ?? 'Tip verification failed');
+        setTipTxHash(txHash);
+        setTipSent(true);
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : '';
+      if (!msg.toLowerCase().includes('cancel') && !msg.toLowerCase().includes('denied')) {
+        setTipError(msg || 'Tip failed');
+      }
+    } finally {
+      setSending(false);
+    }
+  }, [claimStatus, creatorWallet, creatorHandle, gateMode, linkId, onUnlock]);
+
+  const actionLabel = gateMode ? 'Unlock' : 'Tip';
+
+  if (!isGdAvailable()) {
+    if (gateMode) {
+      return (
+        <div className="glass" style={{ padding: '1.25rem', textAlign: 'center' }}>
+          <p style={{ color: 'var(--text-muted)', fontSize: '0.82rem' }}>
+            G$ unlock is only available on Celo mainnet.
+          </p>
+        </div>
+      );
+    }
+    return null;
+  }
+
+  if (tipSent && !gateMode) {
+    return (
+      <div className="glass" style={{ padding: '1.5rem', textAlign: 'center' }}>
+        <div style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>💚</div>
+        <p style={{ fontWeight: 700, fontSize: '0.95rem', marginBottom: '0.3rem' }}>
+          G$ tip sent to @{creatorHandle}!
+        </p>
+        <p style={{ color: 'var(--text-muted)', fontSize: '0.78rem' }}>
+          You supported this creator for free using your daily UBI.
+        </p>
+        {tipTxHash && (
+          <a
+            href={`https://celoscan.io/tx/${tipTxHash}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{ color: 'var(--accent-celo)', fontSize: '0.72rem', marginTop: '0.5rem', display: 'block' }}
+          >
+            View on Celoscan →
+          </a>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div className="glass" style={{ padding: '1.25rem', textAlign: 'center' }}>
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: '0.5rem',
+        justifyContent: 'center', marginBottom: '0.75rem',
+      }}>
+        <span style={{ fontSize: '1.2rem' }}>{gateMode ? '🔓' : '🌍'}</span>
+        <span style={{ fontWeight: 700, fontSize: '0.9rem' }}>
+          {gateMode ? 'G$ Unlock' : 'Free G$ Tip'}
+        </span>
+      </div>
+
+      {claimStatus.status === 'not_connected' && (
+        <>
+          <p style={{ color: 'var(--text-muted)', fontSize: '0.78rem', lineHeight: 1.5, marginBottom: '0.75rem' }}>
+            {gateMode
+              ? `Claim your free daily G$ (GoodDollar UBI) and tip @${creatorHandle} to unlock this content — costs you nothing.`
+              : `Claim your free daily G$ (GoodDollar UBI) and tip @${creatorHandle} — costs you nothing.`}
+          </p>
+          <button
+            className="btn btn-secondary"
+            onClick={handleCheckClaim}
+            style={{ width: '100%', fontSize: '0.9rem' }}
+          >
+            🌍 Check G$ Claim
+          </button>
+        </>
+      )}
+
+      {claimStatus.status === 'loading' && (
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', padding: '0.5rem' }}>
+          <div className="spinner" />
+          <span style={{ color: 'var(--text-muted)', fontSize: '0.82rem' }}>Checking eligibility…</span>
+        </div>
+      )}
+
+      {claimStatus.status === 'not_whitelisted' && (
+        <>
+          <p style={{ color: 'var(--text-muted)', fontSize: '0.78rem', lineHeight: 1.5, marginBottom: '0.75rem' }}>
+            Your wallet isn't verified with GoodDollar yet. Verify once to claim free G$ daily.
+          </p>
+          <a
+            href="https://wallet.gooddollar.org"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="btn btn-secondary"
+            style={{ width: '100%', textDecoration: 'none', fontSize: '0.9rem' }}
+          >
+            Verify at GoodDollar →
+          </a>
+        </>
+      )}
+
+      {claimStatus.status === 'can_claim' && (
+        <>
+          <p style={{ color: 'var(--text-muted)', fontSize: '0.78rem', lineHeight: 1.5, marginBottom: '0.75rem' }}>
+            You can claim <strong style={{ color: 'var(--accent-celo)' }}>{claimStatus.amount} G$</strong> today.
+            {gateMode
+              ? ` Claim & tip to unlock this content!`
+              : ` Claim it and tip @${creatorHandle} for free!`}
+          </p>
+          <button
+            className="btn btn-primary"
+            onClick={handleClaim}
+            style={{ width: '100%', fontSize: '0.9rem' }}
+          >
+            🌍 Claim {claimStatus.amount} G$ & {actionLabel}
+          </button>
+        </>
+      )}
+
+      {claimStatus.status === 'claiming' && (
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', padding: '0.5rem' }}>
+          <div className="spinner" />
+          <span style={{ color: 'var(--text-muted)', fontSize: '0.82rem' }}>Claiming G$ UBI…</span>
+        </div>
+      )}
+
+      {claimStatus.status === 'claimed' && (
+        <>
+          <p style={{ fontSize: '0.78rem', lineHeight: 1.5, marginBottom: '0.75rem' }}>
+            ✅ Claimed <strong style={{ color: 'var(--accent-celo)' }}>{claimStatus.amount} G$</strong>!
+            {gateMode ? ' Tip to unlock content?' : ` Now tip @${creatorHandle}?`}
+          </p>
+          {tipError && (
+            <p style={{ color: '#ef4444', fontSize: '0.72rem', marginBottom: '0.5rem' }}>{tipError}</p>
+          )}
+          <button
+            className="btn btn-primary"
+            onClick={() => { setTipError(''); handleTip(); }}
+            disabled={sending}
+            style={{ width: '100%', fontSize: '0.9rem' }}
+          >
+            {sending ? (
+              <><div className="spinner" /> {gateMode ? 'Verifying on Celo…' : 'Sending G$…'}</>
+            ) : (
+              `💚 ${actionLabel} with ${claimStatus.amount} G$`
+            )}
+          </button>
+        </>
+      )}
+
+      {claimStatus.status === 'already_claimed' && (
+        <p style={{ color: 'var(--text-muted)', fontSize: '0.78rem', lineHeight: 1.5 }}>
+          You already claimed today. Next claim available{' '}
+          {claimStatus.nextClaimTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}.
+        </p>
+      )}
+
+      {claimStatus.status === 'error' && (
+        <>
+          <p style={{ color: '#ef4444', fontSize: '0.78rem', marginBottom: '0.5rem' }}>{claimStatus.message}</p>
+          <button
+            className="btn btn-secondary"
+            onClick={handleCheckClaim}
+            style={{ width: '100%', fontSize: '0.85rem' }}
+          >
+            Try Again
+          </button>
+        </>
+      )}
+
+      <p style={{ color: 'var(--text-muted)', fontSize: '0.62rem', marginTop: '0.75rem' }}>
+        Powered by <a href="https://gooddollar.org" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent-celo)', textDecoration: 'none' }}>GoodDollar</a> · Universal Basic Income on Celo
+      </p>
+    </div>
+  );
+}

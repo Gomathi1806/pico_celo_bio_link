@@ -2,12 +2,14 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { getCreatorByHandle, getCreatorLinks } from '@/app/actions/creator';
 import type { PicoLink } from '@/db/schema';
+import ClaimGD from '@/components/ClaimGD';
 
 export const dynamic = 'force-dynamic';
 
 const TYPE_EMOJI: Record<string, string> = {
   tip: '🍵', coffee: '🍵', pdf: '📄', guide: '📘',
   call: '🎯', audio: '🎙️', video: '🎬', other: '🎁',
+  gd_gate: '🌍',
 };
 
 const TOKEN_LABELS: Record<string, string> = {
@@ -94,10 +96,17 @@ export default async function CreatorBioPage(props: { params: Promise<{ handle: 
                   </div>
 
                   <div style={{ textAlign: 'right', flexShrink: 0, marginLeft: '1rem' }}>
-                    <div style={{ fontWeight: 800, fontSize: '1.1rem', color: 'var(--accent-celo)' }}>
-                      ${link.price}
-                    </div>
-                    <div style={{ color: 'var(--text-muted)', fontSize: '0.65rem' }}>{TOKEN_LABELS[link.token] ?? link.token}</div>
+                    {link.type === 'gd_gate' ? (
+                      <>
+                        <div style={{ fontWeight: 800, fontSize: '0.85rem', color: 'var(--accent-celo)' }}>FREE</div>
+                        <div style={{ color: 'var(--text-muted)', fontSize: '0.65rem' }}>with G$</div>
+                      </>
+                    ) : (
+                      <>
+                        <div style={{ fontWeight: 800, fontSize: '1.1rem', color: 'var(--accent-celo)' }}>${link.price}</div>
+                        <div style={{ color: 'var(--text-muted)', fontSize: '0.65rem' }}>{TOKEN_LABELS[link.token] ?? link.token}</div>
+                      </>
+                    )}
                   </div>
                 </div>
               </Link>
@@ -105,6 +114,14 @@ export default async function CreatorBioPage(props: { params: Promise<{ handle: 
           })}
         </div>
       )}
+
+      {/* G$ Claim & Tip */}
+      <div style={{ marginTop: '1.25rem' }}>
+        <ClaimGD
+          creatorWallet={creator.walletAddress as `0x${string}`}
+          creatorHandle={creator.handle}
+        />
+      </div>
 
       {/* Footer */}
       <footer style={{ marginTop: '3rem', textAlign: 'center', paddingBottom: '3rem' }}>

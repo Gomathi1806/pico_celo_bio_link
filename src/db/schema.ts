@@ -1,4 +1,4 @@
-import { pgTable, text, timestamp, decimal, uuid, integer } from 'drizzle-orm/pg-core';
+import { pgTable, text, timestamp, decimal, uuid, integer, date, uniqueIndex } from 'drizzle-orm/pg-core';
 
 export const creators = pgTable('creators', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -16,7 +16,7 @@ export const picoLinks = pgTable('pico_links', {
   price: decimal('price', { precision: 10, scale: 2 }).notNull(),
   contentUrl: text('content_url'),              // null = tip only (no reward)
   thankYouMessage: text('thank_you_message'),   // shown after payment
-  type: text('type').notNull().default('tip'),  // tip | coffee | pdf | guide | call | other
+  type: text('type').notNull().default('tip'),  // tip | coffee | pdf | guide | call | other | gd_gate
   token: text('token').notNull().default('USDC'), // USDC | cUSD | cEUR | cREAL
   salesCount: integer('sales_count').notNull().default(0),
   totalEarnings: decimal('total_earnings', { precision: 10, scale: 2 }).notNull().default('0'),
@@ -32,8 +32,41 @@ export const purchases = pgTable('purchases', {
   createdAt: timestamp('created_at').defaultNow(),
 });
 
+export const streaks = pgTable('streaks', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  walletAddress: text('wallet_address').notNull(),
+  creatorId: uuid('creator_id').notNull().references(() => creators.id),
+  currentStreak: integer('current_streak').notNull().default(0),
+  longestStreak: integer('longest_streak').notNull().default(0),
+  lastActivityDate: date('last_activity_date'),
+  totalInteractions: integer('total_interactions').notNull().default(0),
+  updatedAt: timestamp('updated_at').defaultNow(),
+}, (table) => [
+  uniqueIndex('streaks_wallet_creator_idx').on(table.walletAddress, table.creatorId),
+]);
+
+export const gdTips = pgTable('gd_tips', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  senderAddress: text('sender_address').notNull(),
+  creatorId: uuid('creator_id').notNull().references(() => creators.id),
+  amount: text('amount').notNull(),
+  txHash: text('tx_hash').notNull().unique(),
+  createdAt: timestamp('created_at').defaultNow(),
+});
+
+export const gdUnlocks = pgTable('gd_unlocks', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  linkId: uuid('link_id').notNull().references(() => picoLinks.id),
+  buyerAddress: text('buyer_address').notNull(),
+  txHash: text('tx_hash').notNull().unique(),
+  createdAt: timestamp('created_at').defaultNow(),
+});
+
 export type Creator = typeof creators.$inferSelect;
 export type NewCreator = typeof creators.$inferInsert;
 export type PicoLink = typeof picoLinks.$inferSelect;
 export type NewPicoLink = typeof picoLinks.$inferInsert;
 export type Purchase = typeof purchases.$inferSelect;
+export type Streak = typeof streaks.$inferSelect;
+export type GdTip = typeof gdTips.$inferSelect;
+export type GdUnlock = typeof gdUnlocks.$inferSelect;

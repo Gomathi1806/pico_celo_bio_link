@@ -1,15 +1,17 @@
 'use client';
 
-import React, { useState, useEffect, use } from 'react';
+import React, { useState, useEffect, useCallback, use } from 'react';
 import Link from 'next/link';
 import { detectWallet, connectMiniPay, sendToken, TOKENS, ALL_TOKENS, DEFAULT_TOKEN, type TokenSymbol, isMiniPay } from '@/lib/minipay';
 import { MINIPAY_TOKENS } from '@/lib/tokens';
-import { getLinkWithCreator, hasPurchased, recordPurchase } from '@/app/actions/creator';
+import { getLinkWithCreator, hasPurchased, recordPurchase, hasGdUnlocked } from '@/app/actions/creator';
 import type { PicoLink } from '@/db/schema';
+import ClaimGD from '@/components/ClaimGD';
 
 const TYPE_EMOJI: Record<string, string> = {
   tip: '🍵', coffee: '🍵', pdf: '📄', guide: '📘',
   call: '🎯', audio: '🎙️', video: '🎬', other: '🎁',
+  gd_gate: '🌍',
 };
 
 const OPERATOR = process.env.NEXT_PUBLIC_OPERATOR_ADDRESS as `0x${string}` | undefined;
@@ -22,11 +24,14 @@ export default function SupportPage(props: { params: Promise<{ id: string }> }) 
 
   const [link, setLink]               = useState<PicoLink | null>(null);
   const [creatorWallet, setCreatorWallet] = useState<`0x${string}` | ''>('');
+  const [creatorHandle, setCreatorHandle] = useState('');
   const [state, setState]             = useState<UIState>('loading');
   const [contentUrl, setContentUrl]   = useState('');
   const [thankYou, setThankYou]       = useState('');
   const [errorMsg, setErrorMsg]       = useState('');
   const [selectedToken, setSelectedToken] = useState<TokenSymbol>(DEFAULT_TOKEN);
+
+  const isGdGate = link?.type === 'gd_gate';
 
   useEffect(() => {
     async function init() {
@@ -34,23 +39,32 @@ export default function SupportPage(props: { params: Promise<{ id: string }> }) 
       if (!result) { setState('idle'); return; }
       setLink(result.link);
       setCreatorWallet(result.creatorWallet);
-      // Use the creator's preferred token as default
+      setCreatorHandle(result.creatorHandle);
       const preferred = (result.link.token ?? DEFAULT_TOKEN) as TokenSymbol;
       setSelectedToken(preferred);
 
       if (isMiniPay()) {
         try {
           const { address } = await connectMiniPay();
-          const owned = await hasPurchased(id, address);
-          if (owned) {
-            setContentUrl(result.link.contentUrl ?? '');
-            setThankYou(result.link.thankYouMessage ?? '');
-            setState('already-owned');
-            return;
+          if (result.link.type === 'gd_gate') {
+            const unlocked = await hasGdUnlocked(id, address);
+            if (unlocked) {
+              setContentUrl(result.link.contentUrl ?? '');
+              setThankYou(result.link.thankYouMessage ?? '');
+              setState('already-owned');
+              return;
+            }
+          } else {
+            const owned = await hasPurchased(id, address);
+            if (owned) {
+              setContentUrl(result.link.contentUrl ?? '');
+              setThankYou(result.link.thankYouMessage ?? '');
+              setState('already-owned');
+              return;
+            }
           }
         } catch { /* proceed */ }
       } else {
-        // Outside MiniPay, check if wallet is injected
         const found = await detectWallet(1000);
         if (!found) {
           setState('no-minipay');
@@ -62,6 +76,12 @@ export default function SupportPage(props: { params: Promise<{ id: string }> }) 
     }
     init();
   }, [id]);
+
+  const handleGdUnlock = useCallback((data: { contentUrl: string; thankYouMessage: string }) => {
+    setContentUrl(data.contentUrl);
+    setThankYou(data.thankYouMessage);
+    setState('unlocked');
+  }, []);
 
   const handlePay = async () => {
     if (!link || !creatorWallet) return;
@@ -200,7 +220,7 @@ export default function SupportPage(props: { params: Promise<{ id: string }> }) 
   }
 
   const emoji    = TYPE_EMOJI[link.type] ?? '🎁';
-  const isTip    = !link.contentUrl;
+  const isTip    = !link.contentUrl && !isGdGate;
   const isPaying = state === 'sending' || state === 'verifying';
   const tokenMeta = TOKENS[selectedToken];
 
@@ -241,6 +261,65 @@ export default function SupportPage(props: { params: Promise<{ id: string }> }) 
           style={{ textDecoration: 'none', display: 'block', width: '100%' }}>
           ← Back to Pico
         </Link>
+      </div>
+    );
+  }
+
+  // ── G$-gated content ──
+  if (isGdGate) {
+    return (
+      <div className="animate-fade">
+        <div style={{ marginBottom: '1.5rem' }}>
+          <Link href="/" style={{ color: 'var(--text-muted)', textDecoration: 'none', fontSize: '0.85rem' }}>
+            ← Back
+          </Link>
+        </div>
+
+        <div className="glass" style={{ padding: '2rem', textAlign: 'center', marginBottom: '1.25rem' }}>
+          <div style={{ fontSize: '3rem', marginBottom: '0.75rem' }}>🌍</div>
+          <h2 style={{ fontSize: '1.3rem', fontWeight: 800, marginBottom: '0.5rem' }}>
+            {link.title}
+          </h2>
+          {link.description && (
+            <p style={{ color: 'var(--text-muted)', fontSize: '0.88rem', lineHeight: 1.6, marginBottom: '1rem' }}>
+              {link.description}
+            </p>
+          )}
+          <div style={{
+            display: 'inline-flex', alignItems: 'center', gap: '0.4rem',
+            background: 'rgba(53,208,127,0.1)', border: '1px solid rgba(53,208,127,0.25)',
+            borderRadius: '100px', padding: '0.5rem 1.25rem', marginBottom: '1rem',
+          }}>
+            <span style={{ fontSize: '1rem' }}>🌍</span>
+            <span style={{ fontWeight: 800, color: 'var(--accent-celo)', fontSize: '0.95rem' }}>FREE with G$</span>
+          </div>
+          <p style={{ color: 'var(--text-muted)', fontSize: '0.78rem', lineHeight: 1.5 }}>
+            Unlock this content by claiming your free daily G$ UBI and tipping @{creatorHandle}. Costs you nothing.
+          </p>
+          {link.salesCount > 0 && (
+            <p style={{ color: 'var(--accent-celo)', fontSize: '0.68rem', fontWeight: 700, marginTop: '0.5rem' }}>
+              {link.salesCount} person{link.salesCount !== 1 ? 's' : ''} unlocked this
+            </p>
+          )}
+        </div>
+
+        {creatorWallet && creatorHandle && (
+          <ClaimGD
+            creatorWallet={creatorWallet as `0x${string}`}
+            creatorHandle={creatorHandle}
+            gateMode
+            linkId={id}
+            onUnlock={handleGdUnlock}
+          />
+        )}
+
+        <footer style={{ marginTop: '3rem', textAlign: 'center', paddingBottom: '3rem' }}>
+          <Link href="/" style={{ textDecoration: 'none' }}>
+            <p style={{ color: 'var(--text-muted)', fontSize: '0.7rem', marginBottom: '0.5rem' }}>
+              🍵 Powered by <strong style={{ color: 'white' }}>Pico</strong> · Get your free page
+            </p>
+          </Link>
+        </footer>
       </div>
     );
   }
@@ -357,6 +436,16 @@ export default function SupportPage(props: { params: Promise<{ id: string }> }) 
           </div>
         )}
       </div>
+
+      {/* G$ Claim & Tip */}
+      {creatorWallet && creatorHandle && (
+        <div style={{ marginTop: '1.25rem' }}>
+          <ClaimGD
+            creatorWallet={creatorWallet as `0x${string}`}
+            creatorHandle={creatorHandle}
+          />
+        </div>
+      )}
 
       <footer style={{ marginTop: '3rem', textAlign: 'center', paddingBottom: '3rem' }}>
         <Link href="/" style={{ textDecoration: 'none' }}>

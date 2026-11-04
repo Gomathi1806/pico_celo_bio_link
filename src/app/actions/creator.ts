@@ -1,9 +1,10 @@
 'use server';
 
 import { getDb } from '@/db';
-import { creators, picoLinks, purchases } from '@/db/schema';
+import { creators, picoLinks, purchases, gdTips, gdUnlocks } from '@/db/schema';
 import { eq, desc } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
+import { recordStreakActivity } from './streaks';
 
 export async function getOrCreateCreator(walletAddress: string, handle?: string) {
   const db = getDb();
@@ -104,6 +105,10 @@ export async function recordPurchase(data: {
       await db.update(picoLinks)
         .set({ salesCount: (link.salesCount ?? 0) + 1, totalEarnings: newEarnings })
         .where(eq(picoLinks.id, data.linkId));
+    }
+
+    if (link) {
+      await recordStreakActivity(data.buyerAddress, link.creatorId).catch(() => {});
     }
 
     return { success: true };
@@ -211,7 +216,8 @@ export async function createCreatorWithLink(data: {
   }
 }
 
-/** Get a link AND the creator's wallet address (for direct payment) */
+/** Get a link AND the creator's wallet address (for direct payment).
+ *  contentUrl is NEVER sent to the client — only returned by server-side verify routes. */
 export async function getLinkWithCreator(id: string) {
   try {
     const db = getDb();
@@ -219,9 +225,25 @@ export async function getLinkWithCreator(id: string) {
     if (!link) return null;
     const creator = await db.query.creators.findFirst({ where: eq(creators.id, link.creatorId) });
     if (!creator) return null;
-    return { link, creatorWallet: creator.walletAddress as `0x${string}` };
+    const { contentUrl: _contentUrl, ...safeLink } = link;
+    return { link: safeLink as typeof link, creatorWallet: creator.walletAddress as `0x${string}`, creatorHandle: creator.handle };
   } catch (e) {
     console.error('[getLinkWithCreator] error:', e);
+    return null;
+  }
+}
+
+/** Server-only: get link with contentUrl (for verify routes). */
+export async function getLinkWithCreatorFull(id: string) {
+  try {
+    const db = getDb();
+    const link = await db.query.picoLinks.findFirst({ where: eq(picoLinks.id, id) });
+    if (!link) return null;
+    const creator = await db.query.creators.findFirst({ where: eq(creators.id, link.creatorId) });
+    if (!creator) return null;
+    return { link, creatorWallet: creator.walletAddress as `0x${string}`, creatorHandle: creator.handle };
+  } catch (e) {
+    console.error('[getLinkWithCreatorFull] error:', e);
     return null;
   }
 }
@@ -234,4 +256,57 @@ export async function getCreatorEarnings(creatorId: string) {
   const total = links.reduce((sum, l) => sum + parseFloat(l.totalEarnings ?? '0'), 0);
   const sales = links.reduce((sum, l) => sum + (l.salesCount ?? 0), 0);
   return { total: total.toFixed(2), sales };
+}
+
+export async function hasGdUnlocked(linkId: string, buyerAddress: string) {
+  const db = getDb();
+  const unlock = await db.query.gdUnlocks.findFirst({
+    where: (t, { and, eq }) => and(
+      eq(t.linkId, linkId),
+      eq(t.buyerAddress, buyerAddress.toLowerCase())
+    ),
+  });
+  return !!unlock;
+}
+
+export async function recordGdUnlock(data: {
+  linkId: string;
+  buyerAddress: string;
+  txHash: string;
+}) {
+  try {
+    const db = getDb();
+    const exists = await db.query.gdUnlocks.findFirst({
+      where: eq(gdUnlocks.txHash, data.txHash),
+    });
+    if (exists) return { success: true };
+
+    await db.insert(gdUnlocks).values({
+      linkId: data.linkId,
+      buyerAddress: data.buyerAddress.toLowerCase(),
+      txHash: data.txHash,
+    });
+
+    const link = await db.query.picoLinks.findFirst({ where: eq(picoLinks.id, data.linkId) });
+    if (link) {
+      await db.update(picoLinks)
+        .set({ salesCount: (link.salesCount ?? 0) + 1 })
+        .where(eq(picoLinks.id, data.linkId));
+    }
+
+    return { success: true };
+  } catch (e) {
+    console.error('[recordGdUnlock] error:', e);
+    return { success: false };
+  }
+}
+
+export async function getCreatorGdStats(creatorId: string) {
+  const db = getDb();
+  const tips = await db.query.gdTips.findMany({
+    where: eq(gdTips.creatorId, creatorId),
+  });
+  const totalGd = tips.reduce((sum, t) => sum + parseFloat(t.amount || '0'), 0);
+  const uniqueTippers = new Set(tips.map(t => t.senderAddress)).size;
+  return { totalGd: totalGd.toFixed(2), tipCount: tips.length, uniqueTippers };
 }

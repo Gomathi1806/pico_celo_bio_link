@@ -47,7 +47,6 @@ export const TOKENS: Record<TokenSymbol, {
   },
 };
 
-// MiniPay only supports USDC, USDT, and USDm — cEUR/cREAL shown in browser only
 export const ALL_TOKENS: TokenSymbol[] = ["USDC", "cUSD", "cEUR", "cREAL"];
 export const MINIPAY_TOKENS: TokenSymbol[] = ["USDC", "cUSD"];
 export const DEFAULT_TOKEN: TokenSymbol = "USDC";
