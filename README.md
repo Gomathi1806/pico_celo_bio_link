@@ -8,6 +8,8 @@ Creators generate a shareable payment link in seconds. Fans open the link, tap o
 
 **Live:** [pico-celo-bio-link.vercel.app](https://pico-celo-bio-link.vercel.app)
 
+[![x402-list](https://x402-list.com/badge/pico-mw6zj25d-0.svg)](https://x402-list.com/services/pico-mw6zj25d-0?utm_source=badge&utm_medium=referral&utm_campaign=embed)
+
 ---
 
 ## How It Works
