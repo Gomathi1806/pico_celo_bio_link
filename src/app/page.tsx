@@ -337,6 +337,12 @@ export default function HomePage() {
         </div>
 
         {error && <p style={{ color: '#ef4444', fontSize: '0.82rem', marginBottom: '1.5rem' }}>{error}</p>}
+
+        <div style={{ textAlign: 'center', marginTop: '1.5rem' }}>
+          <a href="https://x402-list.com/services/pico-mw6zj25d-0?utm_source=badge&utm_medium=referral&utm_campaign=embed" target="_blank" rel="noopener noreferrer">
+            <img src="https://x402-list.com/badge/pico-mw6zj25d-0.svg" alt="Listed on x402-list" height={28} />
+          </a>
+        </div>
       </div>
     );
   }
